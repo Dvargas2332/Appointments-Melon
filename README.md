@@ -46,3 +46,9 @@ npm run app:dev
 - `services/api` se puede desplegar como contenedor (ECS Fargate/Elastic Beanstalk).
 - Base de datos en PostgreSQL (RDS/Supabase).
 - Ajustar `DATABASE_URL` y secretos en las variables de entorno del servicio.
+
+## Licencia y derechos
+Copyright (c) 2026 Diego Vargas Almengor. Todos los derechos reservados.
+El código de este repositorio es propietario y no se concede licencia para usar, copiar,
+modificar ni distribuir sin consentimiento escrito del titular. Para usos comerciales
+o cualquier redistribución, se requiere un acuerdo previo y por escrito.
