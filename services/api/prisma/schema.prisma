@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  BUSINESS_OWNER
+  STAFF
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model UserBusiness {
+  id        String   @id @default(cuid())
+  role      UserRole @default(STAFF)
+  name      String?
+  email     String   @unique
+  password  String
+  phone     String?  @unique
+  status    String?  @default("Activo")
+  avatarUrl String?
+  visibility Boolean  @default(true)
+  notifyApp  Boolean  @default(true)
+  notifyEmail Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessesOwned Business[] @relation("BusinessOwner")
+  staffMembership StaffMembership[]
+
+  @@map("user_businesses")
+}
+
+model UserClient {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String
+  phone     String?  @unique
+  status    String?  @default("Disponible")
+  avatarUrl String?
+  visibility Boolean  @default(true)
+  notifyApp  Boolean  @default(true)
+  notifyEmail Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments Appointment[]
+  activities Activity[]
+
+  @@map("user_clients")
+}
+
+model Business {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  category  String
+  phone     String?
+  address   String?
+  timezone  String   @default("Asia/Tokyo")
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner     UserBusiness @relation("BusinessOwner", fields: [ownerId], references: [id])
+  services  Service[]
+  staff     StaffMembership[]
+  rules     AvailabilityRule[]
+  exceptions AvailabilityException[]
+  appointments Appointment[]
+
+  @@index([ownerId])
+}
+
+model StaffMembership {
+  id         String   @id @default(cuid())
+  businessId String
+  userId     String
+  displayName String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  business   Business @relation(fields: [businessId], references: [id])
+  user       UserBusiness @relation(fields: [userId], references: [id])
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+  @@index([userId])
+}
+
+model Service {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  durationMin Int
+  priceYen   Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id])
+  appointments Appointment[]
+
+  @@index([businessId])
+}
+
+model AvailabilityRule {
+  id         String   @id @default(cuid())
+  businessId String
+  dayOfWeek  Int      // 0-6
+  startTime  String   // "09:00"
+  endTime    String   // "18:00"
+
+  business   Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, dayOfWeek])
+}
+
+model AvailabilityException {
+  id         String   @id @default(cuid())
+  businessId String
+  date       DateTime // date at 00:00:00Z
+  isClosed   Boolean  @default(true)
+  startTime  String?
+  endTime    String?
+
+  business   Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, date])
+}
+
+model Appointment {
+  id         String   @id @default(cuid())
+  businessId String
+  customerId String
+  staffId    String?
+  serviceId  String
+  status     AppointmentStatus @default(BOOKED)
+
+  startAt    DateTime
+  endAt      DateTime
+
+  customerNote String?
+  businessNote String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id])
+  customer   UserClient @relation(fields: [customerId], references: [id])
+  service    Service  @relation(fields: [serviceId], references: [id])
+
+  @@index([businessId, startAt])
+  @@index([customerId, startAt])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  note      String?
+  kind      String   // manual o cita (compat)
+  importance String  @default("medium")
+  startAt   DateTime
+  createdAt DateTime @default(now())
+
+  user      UserClient @relation(fields: [userId], references: [id])
+
+  @@index([userId, startAt])
+}

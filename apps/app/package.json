@@ -1,0 +1,42 @@
+{
+  "name": "yoyakuo-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry",
+  "scripts": {
+    "start": "expo start -c",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.9.26",
+    "expo": "^54.0.21",
+    "expo-calendar": "~13.0.0",
+    "expo-image-picker": "~15.0.7",
+    "expo-linear-gradient": "~14.0.1",
+    "expo-status-bar": "~3.0.9",
+    "luxon": "^3.4.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@types/node": "^20.11.0",
+    "@types/react": "~19.1.10",
+    "babel-preset-expo": "~54.0.9",
+    "eslint": "^9.14.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^8.13.0"
+  }
+}

@@ -137,3 +137,17 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Expo / React Native extras
+.expo
+.expo-shared
+*.expo
+
+# OS files
+.DS_Store
+
+# Build outputs
+build
+
+# Prisma local state
+.prisma

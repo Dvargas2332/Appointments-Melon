@@ -1,0 +1,23 @@
+{
+  "name": "yoyakuo-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "scripts": {
+    "api:dev": "npm --workspace services/api run dev",
+    "api:build": "npm --workspace services/api run build",
+    "api:start": "npm --workspace services/api run start:prod",
+    "app:dev": "npm --workspace apps/app run start",
+    "app:android": "npm --workspace apps/app run android",
+    "app:ios": "npm --workspace apps/app run ios",
+    "prisma:generate": "npm --workspace services/api run prisma:generate",
+    "prisma:migrate": "npm --workspace services/api run prisma:migrate",
+    "lint": "npm --workspaces run lint",
+    "typecheck": "npm --workspaces run typecheck"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12"
+  }
+}

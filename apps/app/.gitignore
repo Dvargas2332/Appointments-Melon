@@ -1,0 +1,69 @@
+node_modules
+.expo
+.expo-shared
+dist
+build
+*.log
+# =========================
+# Node / npm
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.local
+.env.*.local
+
+# =========================
+# Expo / React Native
+# =========================
+.expo/
+.expo-shared/
+web-build/
+dist/
+build/
+
+# Metro / Bundler cache
+.metro-cache/
+.haste-map-*
+
+# =========================
+# Prisma
+# =========================
+prisma/dev.db
+prisma/*.db
+prisma/*.db-journal
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# Coverage / Tests
+# =========================
+coverage/
+
+# =========================
+# Temporary / Cache
+# =========================
+tmp/
+temp/
+.cache/

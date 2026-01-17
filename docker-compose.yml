@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    container_name: yoyakuo_db
+    environment:
+      POSTGRES_USER: yoyakuo
+      POSTGRES_PASSWORD: yoyakuo
+      POSTGRES_DB: yoyakuo
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+volumes:
+  db_data:
