@@ -18,17 +18,35 @@ const businessUserSchema = z.object({
   role: z.enum(["BUSINESS_OWNER", "STAFF"]).default("BUSINESS_OWNER"),
 });
 
+const emptyToNull = (value: unknown) => (value === "" ? null : value);
+const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);
+
 const profileSchema = z.object({
-  name: z.string().min(1).optional(),
-  phone: z.string().optional(),
-  status: z.string().optional(),
-  avatarUrl: z.string().url().optional(),
+  name: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
+  phone: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
+  status: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
+  avatarUrl: z.preprocess(emptyToNull, z.string().url().nullable().optional()),
   visibility: z.boolean().optional(),
   notifyApp: z.boolean().optional(),
   notifyEmail: z.boolean().optional(),
-  email: z.string().email().optional(),
-  currentPassword: z.string().optional(),
-  newPassword: z.string().min(6).regex(/[A-Z]/, "Debe tener mayúscula").regex(/[0-9]/, "Debe tener números").optional(),
+  email: z.preprocess(emptyToUndefined, z.string().email().optional()),
+  currentPassword: z.preprocess(emptyToUndefined, z.string().optional()),
+  newPassword: z
+    .preprocess(
+      emptyToUndefined,
+      z.string().min(6).regex(/[A-Z]/, "Debe tener mayúscula").regex(/[0-9]/, "Debe tener números").optional(),
+    ),
+  nombre: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
+  telefono: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
+  estado: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
+  avatar: z.preprocess(emptyToNull, z.string().url().nullable().optional()),
+  avatar_url: z.preprocess(emptyToNull, z.string().url().nullable().optional()),
+  correo: z.preprocess(emptyToUndefined, z.string().email().optional()),
+  passwordActual: z.preprocess(emptyToUndefined, z.string().optional()),
+  contrasenaActual: z.preprocess(emptyToUndefined, z.string().optional()),
+  passwordNueva: z.preprocess(emptyToUndefined, z.string().optional()),
+  contrasenaNueva: z.preprocess(emptyToUndefined, z.string().optional()),
+  password: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
 const activitySchema = z.object({
@@ -76,7 +94,19 @@ export class UsersController {
   updateProfile(@Req() req: RequestWithUser, @Body() body: unknown) {
     try {
       const input = profileSchema.parse(body);
-      return this.booking.updateProfile(req.user.id, req.user.kind, input);
+      const normalized = {
+        name: input.name ?? input.nombre,
+        phone: input.phone ?? input.telefono,
+        status: input.status ?? input.estado,
+        avatarUrl: input.avatarUrl ?? input.avatar ?? input.avatar_url,
+        visibility: input.visibility,
+        notifyApp: input.notifyApp,
+        notifyEmail: input.notifyEmail,
+        email: input.email ?? input.correo,
+        currentPassword: input.currentPassword ?? input.passwordActual ?? input.contrasenaActual,
+        newPassword: input.newPassword ?? input.passwordNueva ?? input.contrasenaNueva ?? input.password,
+      };
+      return this.booking.updateProfile(req.user.id, req.user.kind, normalized);
     } catch (err) {
       if (err instanceof ZodError) throw new BadRequestException(err.issues);
       throw err;

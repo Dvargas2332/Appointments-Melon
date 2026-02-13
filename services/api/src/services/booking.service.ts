@@ -141,10 +141,10 @@ export class BookingService {
 
   async updateProfile(userId: string, kind: "client" | "business", data: UpdateProfileInput) {
     const updateCommon: Prisma.UserClientUpdateInput = {
-      name: data.name ?? undefined,
-      phone: data.phone ?? undefined,
-      status: data.status ?? undefined,
-      avatarUrl: data.avatarUrl ?? undefined,
+      name: data.name === null ? null : data.name ?? undefined,
+      phone: data.phone === null ? null : data.phone ?? undefined,
+      status: data.status === null ? null : data.status ?? undefined,
+      avatarUrl: data.avatarUrl === null ? null : data.avatarUrl ?? undefined,
       visibility: data.visibility ?? undefined,
       notifyApp: data.notifyApp ?? undefined,
       notifyEmail: data.notifyEmail ?? undefined,
@@ -156,6 +156,8 @@ export class BookingService {
       const ok = await compare(currentPassword, record.password);
       if (!ok) throw new BadRequestException("Contraseña actual incorrecta");
       if (newPassword.length < 6) throw new BadRequestException("Contraseña insegura");
+      if (!/[A-Z]/.test(newPassword)) throw new BadRequestException("Debe tener mayúscula");
+      if (!/[0-9]/.test(newPassword)) throw new BadRequestException("Debe tener números");
       return hash(newPassword, 10);
     };
 
@@ -163,7 +165,25 @@ export class BookingService {
       const existing = await this.prisma.userClient.findUnique({ where: { id: userId } });
       if (!existing) throw new NotFoundException("Cliente no encontrado");
       const newHash = await handlePassword(data.currentPassword, data.newPassword, existing);
-      return this.prisma.userClient.update({
+      try {
+        return this.prisma.userClient.update({
+          where: { id: userId },
+          data: {
+            ...updateCommon,
+            email: data.email ?? undefined,
+            password: newHash ?? undefined,
+          },
+        });
+      } catch (error) {
+        this.rethrowPrismaConflict(error, "Cliente ya existe con el mismo email o teléfono");
+        throw error;
+      }
+    }
+    const existing = await this.prisma.userBusiness.findUnique({ where: { id: userId } });
+    if (!existing) throw new NotFoundException("Usuario negocio no encontrado");
+    const newHash = await handlePassword(data.currentPassword, data.newPassword, existing);
+    try {
+      return this.prisma.userBusiness.update({
         where: { id: userId },
         data: {
           ...updateCommon,
@@ -171,18 +191,10 @@ export class BookingService {
           password: newHash ?? undefined,
         },
       });
+    } catch (error) {
+      this.rethrowPrismaConflict(error, "Usuario de negocio ya existe con el mismo email o teléfono");
+      throw error;
     }
-    const existing = await this.prisma.userBusiness.findUnique({ where: { id: userId } });
-    if (!existing) throw new NotFoundException("Usuario negocio no encontrado");
-    const newHash = await handlePassword(data.currentPassword, data.newPassword, existing);
-    return this.prisma.userBusiness.update({
-      where: { id: userId },
-      data: {
-        ...updateCommon,
-        email: data.email ?? undefined,
-        password: newHash ?? undefined,
-      },
-    });
   }
 
   async createActivity(userId: string, input: CreateActivityInput) {

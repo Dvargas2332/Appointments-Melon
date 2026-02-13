@@ -7,8 +7,8 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = Number(process.env.PORT || 3000);
-  await app.listen(port);
-  console.log(`API escuchando on http://localhost:${port}`);
+  await app.listen(port, "0.0.0.0");
+  console.log(`API escuchando en http://0.0.0.0:${port}`);
 }
 
 bootstrap().catch((err) => {
