@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Keyboard,
   Modal,
@@ -17,6 +18,7 @@ import {
   AppState,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import Constants from "expo-constants";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { DateTime } from "luxon";
@@ -24,12 +26,15 @@ import * as Calendar from "expo-calendar";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView, Swipeable } from "react-native-gesture-handler";
 
 import showIcon from "./assets/icons/show.png";
 import hideIcon from "./assets/icons/hide.png";
-import mainLogo from "./assets/brand/main3.png";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type UserKind = "client" | "business";
 
@@ -48,6 +53,7 @@ type Business = {
   phone?: string | null;
   country?: string | null;
   region?: string | null;
+  owner?: { id: string; name?: string | null; avatarUrl?: string | null };
 };
 type Service = { id: string; name: string; durationMin: number; priceYen: number };
 type Slot = { startAt: string; endAt: string };
@@ -84,13 +90,299 @@ type AppNotification = {
   itemId?: string;
 };
 
-const API_BASE_URL =
-  (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined) ||
-  (Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000");
+type DeviceLocationInfo = {
+  latitude: number;
+  longitude: number;
+  country: string;
+  region: string;
+  city: string;
+  timezone: string;
+};
 
-const STORAGE_PROFILE = "schedly_profile_v1";
-const STORAGE_ACTIVITIES = "schedly_activities_v1";
-const STORAGE_NOTIFICATIONS = "schedly_notifications_v1";
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+const normalizeLocationText = (value?: string | null) =>
+  (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const getCountryDisplayName = (countryCode?: string | null) => {
+  if (!countryCode) return "";
+  try {
+    return new Intl.DisplayNames(["es"], { type: "region" }).of(countryCode.toUpperCase()) || countryCode;
+  } catch {
+    return countryCode;
+  }
+};
+
+const splitPhoneParts = (value: string) => {
+  const trimmed = value.trim();
+  const code = phoneCodes.find((item) => trimmed.startsWith(item)) || "";
+  const number = code ? trimmed.slice(code.length).trim() : trimmed;
+  return { code, number };
+};
+
+const resolveTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+};
+
+const COUNTRY_OPTIONS = [
+  "Afganistán",
+  "Albania",
+  "Alemania",
+  "Andorra",
+  "Angola",
+  "Arabia Saudita",
+  "Argelia",
+  "Argentina",
+  "Armenia",
+  "Australia",
+  "Austria",
+  "Azerbaiyán",
+  "Bahamas",
+  "Bangladés",
+  "Barbados",
+  "Baréin",
+  "Bélgica",
+  "Belice",
+  "Benín",
+  "Bielorrusia",
+  "Birmania",
+  "Bolivia",
+  "Bosnia y Herzegovina",
+  "Botsuana",
+  "Brasil",
+  "Brunéi",
+  "Bulgaria",
+  "Burkina Faso",
+  "Burundi",
+  "Bután",
+  "Cabo Verde",
+  "Camboya",
+  "Camerún",
+  "Canadá",
+  "Catar",
+  "Chad",
+  "Chile",
+  "China",
+  "Chipre",
+  "Colombia",
+  "Comoras",
+  "Corea del Norte",
+  "Corea del Sur",
+  "Costa Rica",
+  "Croacia",
+  "Cuba",
+  "Dinamarca",
+  "Dominica",
+  "Ecuador",
+  "Egipto",
+  "El Salvador",
+  "Emiratos Árabes Unidos",
+  "Eritrea",
+  "Eslovaquia",
+  "Eslovenia",
+  "España",
+  "Estados Unidos",
+  "Estonia",
+  "Esuatini",
+  "Etiopía",
+  "Filipinas",
+  "Finlandia",
+  "Fiyi",
+  "Francia",
+  "Gabón",
+  "Gambia",
+  "Georgia",
+  "Ghana",
+  "Granada",
+  "Grecia",
+  "Guatemala",
+  "Guinea",
+  "Guinea-Bisáu",
+  "Guinea Ecuatorial",
+  "Guyana",
+  "Haití",
+  "Honduras",
+  "Hungría",
+  "India",
+  "Indonesia",
+  "Irak",
+  "Irán",
+  "Irlanda",
+  "Islandia",
+  "Islas Marshall",
+  "Islas Salomón",
+  "Israel",
+  "Italia",
+  "Jamaica",
+  "Japón",
+  "Jordania",
+  "Kazajistán",
+  "Kenia",
+  "Kirguistán",
+  "Kiribati",
+  "Kuwait",
+  "Laos",
+  "Lesoto",
+  "Letonia",
+  "Líbano",
+  "Liberia",
+  "Libia",
+  "Liechtenstein",
+  "Lituania",
+  "Luxemburgo",
+  "Madagascar",
+  "Malasia",
+  "Malaui",
+  "Maldivas",
+  "Malí",
+  "Malta",
+  "Marruecos",
+  "Mauricio",
+  "Mauritania",
+  "México",
+  "Micronesia",
+  "Moldavia",
+  "Mónaco",
+  "Mongolia",
+  "Montenegro",
+  "Mozambique",
+  "Namibia",
+  "Nauru",
+  "Nepal",
+  "Nicaragua",
+  "Níger",
+  "Nigeria",
+  "Noruega",
+  "Nueva Zelanda",
+  "Omán",
+  "Países Bajos",
+  "Pakistán",
+  "Palaos",
+  "Panamá",
+  "Papúa Nueva Guinea",
+  "Paraguay",
+  "Perú",
+  "Polonia",
+  "Portugal",
+  "Reino Unido",
+  "República Centroafricana",
+  "República Checa",
+  "República del Congo",
+  "República Democrática del Congo",
+  "República Dominicana",
+  "Ruanda",
+  "Rumania",
+  "Rusia",
+  "Samoa",
+  "San Cristóbal y Nieves",
+  "San Marino",
+  "San Vicente y las Granadinas",
+  "Santa Lucía",
+  "Santo Tomé y Príncipe",
+  "Senegal",
+  "Serbia",
+  "Seychelles",
+  "Sierra Leona",
+  "Singapur",
+  "Siria",
+  "Somalia",
+  "Sri Lanka",
+  "Sudáfrica",
+  "Sudán",
+  "Sudán del Sur",
+  "Suecia",
+  "Suiza",
+  "Surinam",
+  "Tailandia",
+  "Tanzania",
+  "Tayikistán",
+  "Timor Oriental",
+  "Togo",
+  "Tonga",
+  "Trinidad y Tobago",
+  "Túnez",
+  "Turkmenistán",
+  "Turquía",
+  "Tuvalu",
+  "Ucrania",
+  "Uganda",
+  "Uruguay",
+  "Uzbekistán",
+  "Vanuatu",
+  "Vaticano",
+  "Venezuela",
+  "Vietnam",
+  "Yemen",
+  "Yibuti",
+  "Zambia",
+  "Zimbabue",
+];
+
+const getExpoHost = () => {
+  const candidates = [
+    (Constants as { expoConfig?: { hostUri?: string } }).expoConfig?.hostUri,
+    (Constants as { manifest2?: { extra?: { expoClient?: { hostUri?: string } } } }).manifest2?.extra?.expoClient?.hostUri,
+    (Constants as { manifest?: { debuggerHost?: string } }).manifest?.debuggerHost,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const host = candidate.split(",")[0]?.split(":")[0]?.trim();
+    if (host) return host;
+  }
+
+  return null;
+};
+
+const resolveApiBaseUrl = () => {
+  const configured = (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined)?.trim();
+  if (configured) return trimTrailingSlash(configured);
+
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.hostname) {
+    return `http://${window.location.hostname}:3000`;
+  }
+
+  const expoHost = getExpoHost();
+  if (expoHost) {
+    return `http://${expoHost}:3000`;
+  }
+
+  return Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+const OAUTH_ISSUER = process.env.EXPO_PUBLIC_OAUTH_ISSUER as string | undefined;
+const OAUTH_CLIENT_ID = process.env.EXPO_PUBLIC_OAUTH_CLIENT_ID as string | undefined;
+const OAUTH_SCOPES = ((process.env.EXPO_PUBLIC_OAUTH_SCOPES as string | undefined) || "openid profile email").split(/\s+/).filter(Boolean);
+const OAUTH_AUDIENCE = process.env.EXPO_PUBLIC_OAUTH_AUDIENCE as string | undefined;
+// Optional: if your API does not accept the OAuth access_token directly, set an exchange endpoint.
+// Example: https://api.kazehanacloud.com/melon/auth/oauth/exchange
+const OAUTH_EXCHANGE_URL = process.env.EXPO_PUBLIC_OAUTH_EXCHANGE_URL as string | undefined;
+
+type OAuthProviderKey = "google" | "apple" | "line" | "x" | "kazehana";
+type OAuthProviderConfig = {
+  key: OAuthProviderKey;
+  label: string;
+  issuer?: string;
+  clientId?: string;
+  scopes: string[];
+  audience?: string;
+  exchangeUrl?: string;
+  authorizationEndpoint?: string;
+  tokenEndpoint?: string;
+};
+
+const STORAGE_PROFILE = "melon_profile_v1";
+const STORAGE_ACTIVITIES = "melon_activities_v1";
+const STORAGE_NOTIFICATIONS = "melon_notifications_v1";
 
 const palette = {
   background: "#f6f7fb",
@@ -98,11 +390,11 @@ const palette = {
   border: "#e6e7ed",
   muted: "#6b7280",
   text: "#0f172a",
-  accent: "#2c7be5",
-  accentSoft: "#e8f1ff",
-  secondary: "#16a34a",
-  secondarySoft: "#e7f6ec",
-  success: "#6bc48f",
+  accent: "#3f9f57",
+  accentSoft: "#e8f5ea",
+  secondary: "#2f8f4e",
+  secondarySoft: "#dff0e4",
+  success: "#5fa874",
   warning: "#f4c362",
   danger: "#f58c8a",
   brandPurple: "#7b5bff",
@@ -116,6 +408,33 @@ const cleanOptionalText = (value: unknown) => {
   if (!v) return "";
   if (v.toLowerCase() === "null") return "";
   return value;
+};
+const decodeJwtPayload = (jwt: string): Record<string, unknown> | null => {
+  // Client-side decode only (no signature validation). Use only for UX defaults.
+  const parts = jwt.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "===".slice((b64.length + 3) % 4);
+    if (typeof atob !== "function") return null;
+    const json = atob(padded);
+    const obj = JSON.parse(json);
+    return obj && typeof obj === "object" ? (obj as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+const getProviderDiscovery = async (provider: OAuthProviderConfig): Promise<AuthSession.DiscoveryDocument> => {
+  if (provider.authorizationEndpoint && provider.tokenEndpoint) {
+    return {
+      authorizationEndpoint: provider.authorizationEndpoint,
+      tokenEndpoint: provider.tokenEndpoint,
+    };
+  }
+  if (provider.issuer) {
+    return AuthSession.fetchDiscoveryAsync(provider.issuer);
+  }
+  throw new Error(`OAuth no configurado para ${provider.label}`);
 };
 const importanceColors: Record<Importance, string> = {
   low: "#10b981",
@@ -167,6 +486,21 @@ const serviceTemplates: { name: string; durationMin: number; priceYen: number }[
 ];
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
+const expandDateRange = (startIso: string, endIso: string) => {
+  const start = DateTime.fromISO(startIso).startOf("day");
+  const end = DateTime.fromISO(endIso).startOf("day");
+  if (!start.isValid || !end.isValid) return [];
+  const from = start <= end ? start : end;
+  const to = start <= end ? end : start;
+  const dates: string[] = [];
+  let cursor = from;
+  while (cursor <= to) {
+    const iso = cursor.toISODate();
+    if (iso) dates.push(iso);
+    cursor = cursor.plus({ days: 1 });
+  }
+  return dates;
+};
 
 const formatTime = (iso: string, zone: string) => {
   const dt = DateTime.fromISO(iso, { zone });
@@ -225,26 +559,46 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function MelonLogo({ size = 64 }: { size?: number }) {
+  const rind = size;
+  const flesh = size * 0.8;
+  const seed = Math.max(3, size * 0.06);
+  return (
+    <View style={[styles.melonShell, { width: rind, height: rind, borderRadius: rind / 2 }]}>
+      <View style={[styles.melonLeaf, { width: size * 0.22, height: size * 0.22, borderRadius: size * 0.08 }]} />
+      <View style={[styles.melonStem, { width: size * 0.08, height: size * 0.18, borderRadius: size * 0.04 }]} />
+      <View style={[styles.melonFlesh, { width: flesh, height: flesh, borderRadius: flesh / 2 }]}>
+        <View style={styles.melonStripeVertical} />
+        <View style={styles.melonStripeHorizontal} />
+        <View style={styles.melonStripeDiagonalA} />
+        <View style={styles.melonStripeDiagonalB} />
+        <View style={[styles.melonSeed, { width: seed, height: seed, borderRadius: seed / 2, top: "28%", left: "33%" }]} />
+        <View style={[styles.melonSeed, { width: seed, height: seed, borderRadius: seed / 2, top: "49%", left: "54%" }]} />
+        <View style={[styles.melonSeed, { width: seed, height: seed, borderRadius: seed / 2, top: "58%", left: "30%" }]} />
+      </View>
+    </View>
+  );
+}
+
 
 
 export default function App() {
-  const [email, setEmail] = useState("cliente@yoyakuo.test");
+  const [email, setEmail] = useState("cliente@melon.test");
   const [password, setPassword] = useState("1234");
   const [showPassword, setShowPassword] = useState(false);
   const [showRegisterSheet, setShowRegisterSheet] = useState(false);
+  const [showRegisterCountryPicker, setShowRegisterCountryPicker] = useState(false);
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regCountry, setRegCountry] = useState("");
-  const [regTimezone, setRegTimezone] = useState<string>(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    } catch {
-      return "UTC";
-    }
-  });
-  const [isRegDetecting, setIsRegDetecting] = useState(false);
+  const [regTimezone, setRegTimezone] = useState<string>(resolveTimezone);
+  // Timezone/country are derived from device when needed; no explicit "detect" step in the form.
   const [isRegSubmitting, setIsRegSubmitting] = useState(false);
+  const [deviceLocation, setDeviceLocation] = useState<DeviceLocationInfo | null>(null);
+  const [locationPermissionStatus, setLocationPermissionStatus] = useState<Location.PermissionStatus | "unknown">("unknown");
+  const [locationError, setLocationError] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [legalModal, setLegalModal] = useState<null | "terms" | "privacy">(null);
@@ -257,7 +611,9 @@ export default function App() {
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(isoToday());
-  const [accessKind, setAccessKind] = useState<UserKind>("client");
+  const [registerKind, setRegisterKind] = useState<UserKind | null>(null);
+  const [regBusinessName, setRegBusinessName] = useState("");
+  const [regBusinessService, setRegBusinessService] = useState("");
   const [selectedTimezone, setSelectedTimezone] = useState<string>("UTC");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isSlotsLoading, setIsSlotsLoading] = useState(false);
@@ -266,7 +622,11 @@ export default function App() {
   const [showAvailabilityForm, setShowAvailabilityForm] = useState(false);
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [showSettingsForm, setShowSettingsForm] = useState(false);
-  const [availabilityDay, setAvailabilityDay] = useState<number>(1);
+  const [availabilityDays, setAvailabilityDays] = useState<number[]>([1]);
+  const [availabilityRangeStart, setAvailabilityRangeStart] = useState<string | null>(null);
+  const [availabilityRangeEnd, setAvailabilityRangeEnd] = useState<string | null>(null);
+  const [showAvailabilityDatePicker, setShowAvailabilityDatePicker] = useState(false);
+  const [availabilityPickerMonth, setAvailabilityPickerMonth] = useState(DateTime.now().startOf("month"));
   const [availabilityStart, setAvailabilityStart] = useState<string>("09:00");
   const [availabilityEnd, setAvailabilityEnd] = useState<string>("18:00");
   const [serviceName, setServiceName] = useState<string>("Servicio");
@@ -282,17 +642,14 @@ export default function App() {
   const [settingsName, setSettingsName] = useState<string>("");
   const [settingsCategory, setSettingsCategory] = useState<string>("");
   const [settingsTimezone, setSettingsTimezone] = useState<string>("UTC");
-  const [settingsPhone, setSettingsPhone] = useState<string>("");
+  const [settingsPhoneCode, setSettingsPhoneCode] = useState<string>("");
+  const [settingsPhoneNumber, setSettingsPhoneNumber] = useState<string>("");
   const [settingsCountry, setSettingsCountry] = useState<string>("");
   const [settingsRegion, setSettingsRegion] = useState<string>("");
+  const [showSettingsPicker, setShowSettingsPicker] = useState<null | "timezone" | "phoneCode" | "country">(null);
   const [settingsAvailabilityStart, setSettingsAvailabilityStart] = useState<string>("09:00");
   const [settingsAvailabilityEnd, setSettingsAvailabilityEnd] = useState<string>("18:00");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [businessName, setBusinessName] = useState("Mi negocio");
-  const [businessCategory, setBusinessCategory] = useState("Servicios");
-  const [businessPhone, setBusinessPhone] = useState("");
-  const [businessAddress, setBusinessAddress] = useState("");
-  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showForgotForm, setShowForgotForm] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -341,11 +698,13 @@ export default function App() {
     notifyApp: boolean;
     notifyEmail: boolean;
     visibility: boolean;
+    deviceCalendarEnabled: boolean;
   }>(null);
   const [profileName, setProfileName] = useState("");
   const [profileStatus, setProfileStatus] = useState("Disponible");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [showAvatarSheet, setShowAvatarSheet] = useState(false);
+  const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
   const [isPersistingProfile, setIsPersistingProfile] = useState(false);
   const [notifyApp, setNotifyApp] = useState(true);
   const [notifyEmail, setNotifyEmail] = useState(true);
@@ -355,6 +714,7 @@ export default function App() {
   const [newPassword, setNewPassword] = useState("");
   const [deviceEvents, setDeviceEvents] = useState<Activity[]>([]);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [deviceCalendarEnabled, setDeviceCalendarEnabled] = useState(true);
   const [agendaPreview, setAgendaPreview] = useState<null | { source: ScheduleSource; id: string }>(null);
   const prevApptStatusRef = useRef<Record<string, string>>({});
   const isKeyboardVisibleRef = useRef(false);
@@ -368,9 +728,167 @@ export default function App() {
   }, [avatarUri, newEmail, profileName, profilePhone, profileStatus]);
 
   const openClientSettings = useCallback(() => {
-    setClientSettingsSnapshot({ notifyApp, notifyEmail, visibility });
+    setClientSettingsSnapshot({ notifyApp, notifyEmail, visibility, deviceCalendarEnabled });
     setShowClientSettingsModal(true);
-  }, [notifyApp, notifyEmail, visibility]);
+  }, [deviceCalendarEnabled, notifyApp, notifyEmail, visibility]);
+
+  const persistAvatar = useCallback(
+    async (dataUri: string) => {
+      setAvatarUri(dataUri);
+      await AsyncStorage.setItem(
+        STORAGE_PROFILE,
+        JSON.stringify({
+          name: profileName,
+          status: profileStatus,
+          avatarUri: dataUri,
+          notifyApp,
+          notifyEmail,
+          visibility,
+          deviceCalendarEnabled,
+          email: newEmail,
+          phone: profilePhone,
+        }),
+      ).catch(() => undefined);
+
+      if (token) {
+        fetch(`${API_BASE_URL}/users/me`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ avatarUrl: dataUri }),
+        }).catch(() => undefined);
+      }
+    },
+    [deviceCalendarEnabled, newEmail, notifyApp, notifyEmail, profileName, profilePhone, profileStatus, token, visibility],
+  );
+
+  const openAvatarPicker = useCallback(
+    async (source: "camera" | "library") => {
+      Keyboard.dismiss();
+      setShowAvatarSheet(false);
+      await new Promise((resolve) => setTimeout(resolve, 180));
+
+      if (source === "camera") {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert("Permiso requerido", "Activa la cámara para tomar una foto.");
+          return;
+        }
+        const res = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.7,
+          allowsEditing: true,
+          aspect: [1, 1],
+          base64: true,
+        });
+        if (res.canceled) return;
+        const asset = res.assets?.[0];
+        const base64 = asset?.base64;
+        const uri = asset?.uri;
+        const dataUri = base64 ? `data:image/jpeg;base64,${base64}` : uri;
+        if (dataUri) setAvatarPreviewUri(dataUri);
+        return;
+      }
+
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permiso requerido", "Activa el permiso de fotos para cambiar tu avatar.");
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        allowsEditing: true,
+        aspect: [1, 1],
+        base64: true,
+      });
+      if (res.canceled) return;
+      const asset = res.assets?.[0];
+      const base64 = asset?.base64;
+      const uri = asset?.uri;
+      const dataUri = base64 ? `data:image/jpeg;base64,${base64}` : uri;
+      if (dataUri) setAvatarPreviewUri(dataUri);
+    },
+    [],
+  );
+
+  const reverseGeocodeOnWeb = useCallback(async (latitude: number, longitude: number) => {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=es`,
+    );
+    if (!res.ok) throw new Error("No se pudo resolver la ubicación.");
+    const data = await res.json();
+    const address = (data?.address || {}) as Record<string, string | undefined>;
+    return {
+      country: address.country || getCountryDisplayName(address.country_code) || "",
+      region: address.state || address.region || address.county || "",
+      city: address.city || address.town || address.village || "",
+    };
+  }, []);
+
+  const detectDeviceLocation = useCallback(
+    async ({ silent = false, applyToBusinessSettings = false }: { silent?: boolean; applyToBusinessSettings?: boolean } = {}) => {
+      try {
+        setIsLocating(true);
+        setLocationError("");
+        const permission = await Location.requestForegroundPermissionsAsync();
+        setLocationPermissionStatus(permission.status);
+        if (permission.status !== "granted") {
+          throw new Error("Permiso de ubicación denegado.");
+        }
+
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        const timezone = resolveTimezone();
+
+        let locationParts = { country: "", region: "", city: "" };
+        try {
+          const geo = await Location.reverseGeocodeAsync({ latitude, longitude });
+          const first = geo[0];
+          if (first) {
+            locationParts = {
+              country: getCountryDisplayName(first.isoCountryCode) || first.country || "",
+              region: first.region || first.subregion || "",
+              city: first.city || first.district || "",
+            };
+          }
+        } catch {
+          if (Platform.OS === "web") {
+            locationParts = await reverseGeocodeOnWeb(latitude, longitude);
+          }
+        }
+
+        const resolved = {
+          latitude,
+          longitude,
+          country: locationParts.country,
+          region: locationParts.region,
+          city: locationParts.city,
+          timezone,
+        } satisfies DeviceLocationInfo;
+
+        setDeviceLocation(resolved);
+        setSelectedTimezone(timezone);
+        if (applyToBusinessSettings) {
+          if (resolved.country) setSettingsCountry(resolved.country);
+          if (resolved.region) setSettingsRegion(resolved.region);
+          if (resolved.timezone) setSettingsTimezone(resolved.timezone);
+        }
+        return resolved;
+      } catch (err: unknown) {
+        const message = getErrorMessage(err, "No se pudo obtener la ubicación.");
+        setLocationError(message);
+        if (!silent) Alert.alert("Ubicación", message);
+        return null;
+      } finally {
+        setIsLocating(false);
+      }
+    },
+    [reverseGeocodeOnWeb],
+  );
 
   useEffect(() => {
     const onShow = () => {
@@ -414,14 +932,189 @@ export default function App() {
     return (
       notifyApp !== clientSettingsSnapshot.notifyApp ||
       notifyEmail !== clientSettingsSnapshot.notifyEmail ||
-      visibility !== clientSettingsSnapshot.visibility
+      visibility !== clientSettingsSnapshot.visibility ||
+      deviceCalendarEnabled !== clientSettingsSnapshot.deviceCalendarEnabled
     );
-  }, [clientSettingsSnapshot, notifyApp, notifyEmail, visibility]);
+  }, [clientSettingsSnapshot, deviceCalendarEnabled, notifyApp, notifyEmail, visibility]);
 
   const authHeaders = useMemo<Record<string, string> | null>(
     () => (token ? { Authorization: `Bearer ${token}` } : null),
     [token],
   );
+
+  const oauthRedirectUri = useMemo(
+    () =>
+      AuthSession.makeRedirectUri({
+        scheme: "melon",
+        path: "oauth",
+      }),
+    [],
+  );
+  const oauthProviders = useMemo<Record<OAuthProviderKey, OAuthProviderConfig>>(
+    () => ({
+      kazehana: {
+        key: "kazehana",
+        label: "KazehanaCloud",
+        issuer: OAUTH_ISSUER,
+        clientId: OAUTH_CLIENT_ID,
+        scopes: OAUTH_SCOPES,
+        audience: OAUTH_AUDIENCE,
+        exchangeUrl: OAUTH_EXCHANGE_URL,
+      },
+      google: {
+        key: "google",
+        label: "Google",
+        issuer: (process.env.EXPO_PUBLIC_OAUTH_GOOGLE_ISSUER as string | undefined) || "https://accounts.google.com",
+        clientId: process.env.EXPO_PUBLIC_OAUTH_GOOGLE_CLIENT_ID as string | undefined,
+        scopes: ((process.env.EXPO_PUBLIC_OAUTH_GOOGLE_SCOPES as string | undefined) || "openid profile email").split(/\s+/).filter(Boolean),
+        audience: process.env.EXPO_PUBLIC_OAUTH_GOOGLE_AUDIENCE as string | undefined,
+        exchangeUrl: (process.env.EXPO_PUBLIC_OAUTH_GOOGLE_EXCHANGE_URL as string | undefined) || OAUTH_EXCHANGE_URL,
+      },
+      apple: {
+        key: "apple",
+        label: "Apple",
+        issuer: (process.env.EXPO_PUBLIC_OAUTH_APPLE_ISSUER as string | undefined) || "https://appleid.apple.com",
+        clientId: process.env.EXPO_PUBLIC_OAUTH_APPLE_CLIENT_ID as string | undefined,
+        scopes: ((process.env.EXPO_PUBLIC_OAUTH_APPLE_SCOPES as string | undefined) || "openid name email").split(/\s+/).filter(Boolean),
+        audience: process.env.EXPO_PUBLIC_OAUTH_APPLE_AUDIENCE as string | undefined,
+        exchangeUrl: (process.env.EXPO_PUBLIC_OAUTH_APPLE_EXCHANGE_URL as string | undefined) || OAUTH_EXCHANGE_URL,
+        authorizationEndpoint:
+          (process.env.EXPO_PUBLIC_OAUTH_APPLE_AUTH_URL as string | undefined) || "https://appleid.apple.com/auth/authorize",
+        tokenEndpoint:
+          (process.env.EXPO_PUBLIC_OAUTH_APPLE_TOKEN_URL as string | undefined) || "https://appleid.apple.com/auth/token",
+      },
+      line: {
+        key: "line",
+        label: "LINE",
+        issuer: (process.env.EXPO_PUBLIC_OAUTH_LINE_ISSUER as string | undefined) || "https://access.line.me",
+        clientId: process.env.EXPO_PUBLIC_OAUTH_LINE_CLIENT_ID as string | undefined,
+        scopes: ((process.env.EXPO_PUBLIC_OAUTH_LINE_SCOPES as string | undefined) || "openid profile email").split(/\s+/).filter(Boolean),
+        audience: process.env.EXPO_PUBLIC_OAUTH_LINE_AUDIENCE as string | undefined,
+        exchangeUrl: (process.env.EXPO_PUBLIC_OAUTH_LINE_EXCHANGE_URL as string | undefined) || OAUTH_EXCHANGE_URL,
+      },
+      x: {
+        key: "x",
+        label: "X",
+        issuer: process.env.EXPO_PUBLIC_OAUTH_X_ISSUER as string | undefined,
+        clientId: process.env.EXPO_PUBLIC_OAUTH_X_CLIENT_ID as string | undefined,
+        scopes: ((process.env.EXPO_PUBLIC_OAUTH_X_SCOPES as string | undefined) || "tweet.read users.read offline.access").split(/\s+/).filter(Boolean),
+        audience: process.env.EXPO_PUBLIC_OAUTH_X_AUDIENCE as string | undefined,
+        exchangeUrl: (process.env.EXPO_PUBLIC_OAUTH_X_EXCHANGE_URL as string | undefined) || OAUTH_EXCHANGE_URL,
+        authorizationEndpoint:
+          (process.env.EXPO_PUBLIC_OAUTH_X_AUTH_URL as string | undefined) || "https://x.com/i/oauth2/authorize",
+        tokenEndpoint:
+          (process.env.EXPO_PUBLIC_OAUTH_X_TOKEN_URL as string | undefined) || "https://api.x.com/2/oauth2/token",
+      },
+    }),
+    [],
+  );
+  const oauthEnabled = Boolean(oauthProviders.kazehana.issuer && oauthProviders.kazehana.clientId);
+
+  const finishSessionFromToken = useCallback(async (nextToken: string) => {
+    setToken(nextToken);
+
+    // Best effort: get id/email/kind from API.
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/me`, { headers: { Authorization: `Bearer ${nextToken}` } });
+      if (res.ok) {
+        const data = await res.json();
+        const kind = data?.kind === "client" || data?.kind === "business" ? (data.kind as UserKind) : null;
+        const email = typeof data?.email === "string" ? data.email : "";
+        const id = typeof data?.id === "string" ? data.id : "me";
+        if (kind) {
+          setUser({ id, email, kind, role: typeof data?.role === "string" ? data.role : null });
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback: decode JWT for kind/email/sub if present.
+    const claims = decodeJwtPayload(nextToken);
+    const kindClaim = claims?.kind;
+    const kind = kindClaim === "client" || kindClaim === "business" ? (kindClaim as UserKind) : null;
+    const emailClaim = typeof claims?.email === "string" ? (claims.email as string) : "";
+    const sub = typeof claims?.sub === "string" ? (claims.sub as string) : "me";
+    if (kind) setUser({ id: sub, email: emailClaim, kind, role: null });
+  }, []);
+
+  const startOAuthProvider = useCallback(
+    async (provider: OAuthProviderConfig) => {
+      if (!provider.issuer || !provider.clientId) {
+        throw new Error(`OAuth no configurado para ${provider.label}`);
+      }
+
+      const discovery = await getProviderDiscovery(provider);
+      const request = new AuthSession.AuthRequest({
+        clientId: provider.clientId,
+        redirectUri: oauthRedirectUri,
+        responseType: AuthSession.ResponseType.Code,
+        scopes: provider.scopes,
+        usePKCE: true,
+        extraParams: provider.audience ? { audience: provider.audience } : undefined,
+      });
+
+      const result = await request.promptAsync(discovery);
+      if (result.type !== "success") {
+        if (result.type === "dismiss" || result.type === "cancel") return;
+        throw new Error(`OAuth cancelado para ${provider.label}`);
+      }
+
+      const code = (result as AuthSession.AuthSessionResult & { params?: Record<string, string> }).params?.code;
+      if (!code) throw new Error("OAuth: falta authorization code");
+      if (!request.codeVerifier) throw new Error("OAuth: falta PKCE codeVerifier");
+
+      const tokenRes = await AuthSession.exchangeCodeAsync(
+        {
+          clientId: provider.clientId,
+          code,
+          redirectUri: oauthRedirectUri,
+          extraParams: { code_verifier: request.codeVerifier },
+        },
+        discovery,
+      );
+
+      const accessToken = tokenRes.accessToken;
+      if (!accessToken) throw new Error("OAuth: no se recibio access_token");
+
+      if (provider.exchangeUrl) {
+        const ex = await fetch(provider.exchangeUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: provider.key, accessToken, idToken: tokenRes.idToken }),
+        });
+        if (!ex.ok) throw new Error(await ex.text());
+        const data = await ex.json();
+        if (!data?.token || typeof data.token !== "string") throw new Error("OAuth exchange: respuesta invalida");
+        await finishSessionFromToken(data.token);
+        return;
+      }
+
+      await finishSessionFromToken(accessToken);
+    },
+    [finishSessionFromToken, oauthRedirectUri],
+  );
+
+  const handleOAuthLogin = useCallback(
+    async (providerKey: OAuthProviderKey = "kazehana") => {
+      const provider = oauthProviders[providerKey];
+      if (!provider) {
+        Alert.alert("OAuth", "Proveedor no soportado.");
+        return;
+      }
+      try {
+        setIsAuthLoading(true);
+        await startOAuthProvider(provider);
+      } catch (err: unknown) {
+        Alert.alert("Error", getErrorMessage(err, `No se pudo iniciar sesion con ${provider.label}`));
+      } finally {
+        setIsAuthLoading(false);
+      }
+    },
+    [oauthProviders, startOAuthProvider],
+  );
+
   const isClient = user?.kind === "client";
   const isBusiness = user?.kind === "business";
   const selectedBusinessData = useMemo(
@@ -442,16 +1135,52 @@ export default function App() {
       isAsiaRegion
         ? [
             { key: "line", label: "LINE", color: "#06C755" },
+            { key: "google", label: "G", color: "#DB4437" },
             { key: "x", label: "X", color: "#000000" },
-            { key: "ig", label: "IG", color: "#C13584" },
           ]
         : [
-            { key: "whatsapp", label: "WA", color: "#25D366" },
             { key: "google", label: "G", color: "#DB4437" },
+            { key: "apple", label: "A", color: "#111111" },
             { key: "x", label: "X", color: "#000000" },
           ],
     [isAsiaRegion],
   );
+  const settingsPickerTitle =
+    showSettingsPicker === "timezone"
+      ? "Selecciona la zona horaria"
+      : showSettingsPicker === "phoneCode"
+        ? "Selecciona el código"
+        : showSettingsPicker === "country"
+          ? "Selecciona el país"
+          : "";
+  const settingsPickerOptions =
+    showSettingsPicker === "timezone"
+      ? defaultTimezones
+      : showSettingsPicker === "phoneCode"
+        ? phoneCodes
+        : showSettingsPicker === "country"
+          ? COUNTRY_OPTIONS
+          : [];
+  const settingsPhone = `${settingsPhoneCode}${settingsPhoneCode && settingsPhoneNumber ? " " : ""}${settingsPhoneNumber}`.trim();
+  const availabilityRangeDates = useMemo(
+    () => (availabilityRangeStart && availabilityRangeEnd ? expandDateRange(availabilityRangeStart, availabilityRangeEnd) : []),
+    [availabilityRangeEnd, availabilityRangeStart],
+  );
+  const availabilitySummary = useMemo(() => {
+    const dayLabels = availabilityDays.map((d) => ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][d]).join(", ");
+    const dateSummary =
+      availabilityRangeStart && availabilityRangeEnd
+        ? `${availabilityRangeStart} a ${availabilityRangeEnd}`
+        : availabilityRangeStart
+          ? `Desde ${availabilityRangeStart}`
+          : "";
+    const parts = [];
+    if (dayLabels) parts.push(dayLabels);
+    if (dateSummary) parts.push(dateSummary);
+    const range = availabilityStart && availabilityEnd ? `${availabilityStart} - ${availabilityEnd}` : "";
+    if (range) parts.push(range);
+    return parts.join(" · ");
+  }, [availabilityDays, availabilityEnd, availabilityRangeEnd, availabilityRangeStart, availabilityStart]);
   const scheduleItems = useMemo(
     () => [
       ...appointments.map((a) => ({
@@ -475,21 +1204,23 @@ export default function App() {
         kind: c.kind,
         importance: c.importance || "medium",
       })),
-      ...deviceEvents.map((e) => ({
-        source: "device" as const,
-        id: e.id,
-        title: e.title || "Evento calendario",
-        subtitle: e.businessName || e.note || "Calendario del dispositivo",
-        note: e.note,
-        startAt: e.startAt,
-        endAt: e.endAt,
-        calendarEventId: e.calendarEventId,
-        status: "CALENDARIO",
-        kind: "manual" as const,
-        importance: "low" as Importance,
-      })),
+      ...(deviceCalendarEnabled
+        ? deviceEvents.map((e) => ({
+            source: "device" as const,
+            id: e.id,
+            title: e.title || "Evento calendario",
+            subtitle: e.businessName || e.note || "Calendario del dispositivo",
+            note: e.note,
+            startAt: e.startAt,
+            endAt: e.endAt,
+            calendarEventId: e.calendarEventId,
+            status: "CALENDARIO",
+            kind: "manual" as const,
+            importance: "low" as Importance,
+          }))
+        : []),
     ],
-    [appointments, customActivities, deviceEvents],
+    [appointments, customActivities, deviceCalendarEnabled, deviceEvents],
   );
   const orderedSchedule = useMemo(
     () =>
@@ -690,14 +1421,36 @@ export default function App() {
     const gridStart = start.minus({ days: start.weekday - 1 });
     return Array.from({ length: 42 }, (_, i) => gridStart.plus({ days: i }));
   }, [bookingPickerMonth]);
+  const availabilityMonthDays = useMemo(() => {
+    const start = availabilityPickerMonth.startOf("month");
+    const gridStart = start.minus({ days: start.weekday - 1 });
+    return Array.from({ length: 42 }, (_, i) => gridStart.plus({ days: i }));
+  }, [availabilityPickerMonth]);
   const filteredBusinesses = useMemo(
-    () =>
-      businesses.filter((b) => {
+    () => {
+      const termFiltered = businesses.filter((b) => {
         if (!searchTerm.trim()) return true;
         const term = searchTerm.toLowerCase();
         return b.name.toLowerCase().includes(term) || (b.category || "").toLowerCase().includes(term);
-      }),
-    [businesses, searchTerm],
+      });
+
+      if (!isClient || !deviceLocation?.country) return termFiltered;
+
+      const userCountry = normalizeLocationText(deviceLocation.country);
+      const userRegion = normalizeLocationText(deviceLocation.region);
+      const scored = termFiltered.map((b) => {
+        const businessCountry = normalizeLocationText(b.country);
+        const businessRegion = normalizeLocationText(b.region);
+        let score = 0;
+        if (userCountry && businessCountry && businessCountry === userCountry) score = 1;
+        if (userRegion && businessRegion && businessRegion === userRegion) score = 2;
+        return { business: b, score };
+      });
+      const matched = scored.filter((item) => item.score > 0);
+      const source = matched.length ? matched : scored;
+      return source.sort((a, b) => b.score - a.score || a.business.name.localeCompare(b.business.name)).map((item) => item.business);
+    },
+    [businesses, deviceLocation, isClient, searchTerm],
   );
   const businessStats = useMemo(() => {
     const zone = currentZone;
@@ -719,13 +1472,13 @@ export default function App() {
     };
   }, [appointments, currentZone]);
 
-  const handleLogin = async (kind: UserKind) => {
+  const handleLogin = async () => {
     setIsAuthLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, kind }),
+        body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
         const msg = await res.text();
@@ -748,13 +1501,23 @@ export default function App() {
       const pwd = regPassword;
       const country = regCountry.trim();
       const timezone = regTimezone.trim() || "UTC";
+      const bizName = regBusinessName.trim();
+      const bizService = regBusinessService.trim();
 
       if (!name || !em || !pwd || !country) {
-        Alert.alert("Faltan datos", "Completa nombre, correo, contraseña y país.");
+        Alert.alert("Faltan datos", "Completa usuario, correo, contraseña y país.");
         return;
       }
       if (pwd.length < 4) {
         Alert.alert("Contraseña", "La contraseña debe tener al menos 4 caracteres.");
+        return;
+      }
+      if (!kind) {
+        Alert.alert("Tipo de cuenta", "Selecciona si quieres crear cuenta de Cliente o Empresa.");
+        return;
+      }
+      if (kind === "business" && (!bizName || !bizService)) {
+        Alert.alert("Faltan datos", "Para Empresa, completa nombre de la empresa y el servicio que brinda.");
         return;
       }
 
@@ -772,12 +1535,37 @@ export default function App() {
         const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: em, password: pwd, kind }),
+          body: JSON.stringify({ email: em, password: pwd }),
         });
         if (!loginRes.ok) throw new Error(await loginRes.text());
         const data = await loginRes.json();
         setToken(data.token);
         setUser(data.user);
+
+        // For business users, create an initial tenant business + default service right away.
+        if (kind === "business") {
+          const auth = { Authorization: `Bearer ${data.token}` } as const;
+          const createBiz = await fetch(`${API_BASE_URL}/businesses`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...auth },
+            body: JSON.stringify({
+              name: bizName,
+              category: bizService,
+              country: country || undefined,
+              region: deviceLocation?.region || undefined,
+              timezone,
+            }),
+          });
+          if (!createBiz.ok) throw new Error(await createBiz.text());
+          const createdBiz: Business = await createBiz.json();
+          setSelectedBusiness(createdBiz.id);
+          if (createdBiz.timezone) setSelectedTimezone(createdBiz.timezone);
+          await fetch(`${API_BASE_URL}/businesses/${createdBiz.id}/services`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...auth },
+            body: JSON.stringify({ name: bizService, durationMin: 30, priceYen: 0, isActive: true }),
+          }).catch(() => undefined);
+        }
 
         // Use detected timezone for the app immediately and persist basic region info locally.
         setSelectedTimezone(timezone);
@@ -790,6 +1578,7 @@ export default function App() {
             notifyApp,
             notifyEmail,
             visibility,
+            deviceCalendarEnabled,
             email: em,
             phone: profilePhone,
             country,
@@ -803,6 +1592,8 @@ export default function App() {
         setRegEmail("");
         setRegPassword("");
         setRegCountry("");
+        setRegBusinessName("");
+        setRegBusinessService("");
         setShowRegisterSheet(false);
       } catch (err: unknown) {
         Alert.alert("Error", getErrorMessage(err, "No se pudo crear la cuenta."));
@@ -812,8 +1603,12 @@ export default function App() {
     },
     [
       avatarUri,
+      deviceCalendarEnabled,
       notifyApp,
       notifyEmail,
+      regBusinessName,
+      regBusinessService,
+      deviceLocation,
       profilePhone,
       profileStatus,
       regCountry,
@@ -825,35 +1620,7 @@ export default function App() {
     ],
   );
 
-  const detectRegionFromDevice = useCallback(async () => {
-    setIsRegDetecting(true);
-    try {
-      let tz = "UTC";
-      try {
-        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      } catch {
-        tz = "UTC";
-      }
-      setRegTimezone(tz);
-
-      const perm = await Location.requestForegroundPermissionsAsync();
-      if (perm.status !== "granted") {
-        Alert.alert("Permiso requerido", "Activa la ubicación para detectar el país.");
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const rev = await Location.reverseGeocodeAsync({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      });
-      const first = rev?.[0];
-      if (first?.country) setRegCountry(first.country);
-    } catch (err: unknown) {
-      Alert.alert("Detección", getErrorMessage(err, "No se pudo detectar la región del dispositivo."));
-    } finally {
-      setIsRegDetecting(false);
-    }
-  }, []);
+  // detectRegionFromDevice removed: we don't ask for location permission during signup.
 
   const fetchBusinesses = useCallback(async () => {
     try {
@@ -865,8 +1632,8 @@ export default function App() {
         setSelectedBusiness(data[0].id);
         if (data[0].timezone) setSelectedTimezone(data[0].timezone);
       }
-    } catch (err) {
-      console.warn("Error cargando negocios", err);
+    } catch {
+      void 0;
     }
   }, [isClient, selectedBusiness]);
 
@@ -882,40 +1649,10 @@ export default function App() {
         setSelectedBusiness(data[0].id);
         if (data[0].timezone) setSelectedTimezone(data[0].timezone);
       }
-    } catch (err) {
-      console.warn("Error cargando negocios propios", err);
+    } catch {
+      setMyBusinesses([]);
     }
   }, [authHeaders]);
-
-  const createBusinessProfile = useCallback(async () => {
-    if (!authHeaders) {
-      Alert.alert("Sesion requerida", "Inicia sesion como negocio para crear perfil");
-      return;
-    }
-    setIsCreatingBusiness(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/businesses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({
-          name: businessName || "Mi negocio",
-          category: businessCategory || "Servicios",
-          phone: businessPhone || undefined,
-          address: businessAddress || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const created: Business = await res.json();
-      setMyBusinesses([created, ...myBusinesses]);
-      setSelectedBusiness(created.id);
-      if (created.timezone) setSelectedTimezone(created.timezone);
-      Alert.alert("Negocio creado", "Perfil de negocio listo");
-    } catch (err: unknown) {
-      Alert.alert("Error", getErrorMessage(err, "No se pudo crear el negocio"));
-    } finally {
-      setIsCreatingBusiness(false);
-    }
-  }, [authHeaders, businessAddress, businessCategory, businessName, businessPhone, myBusinesses]);
 
   const fetchServices = useCallback(
     async (businessId: string) => {
@@ -969,8 +1706,7 @@ export default function App() {
         } else {
           setAppointments([]);
         }
-      } catch (err) {
-        console.warn("Error cargando citas", err);
+      } catch {
         setAppointments([]);
       } finally {
         setIsAppointmentsLoading(false);
@@ -1002,7 +1738,7 @@ export default function App() {
       setClientTab("agenda");
       setBookingSelectedStartAt(null);
       setBookingNote("");
-      Alert.alert("Solicitud enviada", "Tu cita quedó pendiente hasta que el negocio la apruebe.");
+      Alert.alert("Cita agendada", "Tu cita fue reservada correctamente.");
     } catch (err: unknown) {
       Alert.alert("Error", getErrorMessage(err, "No se pudo crear la cita."));
     } finally {
@@ -1080,13 +1816,14 @@ export default function App() {
           notifyApp: typeof data.notifyApp === "boolean" ? data.notifyApp : notifyApp,
           notifyEmail: typeof data.notifyEmail === "boolean" ? data.notifyEmail : notifyEmail,
           visibility: typeof data.visibility === "boolean" ? data.visibility : visibility,
+          deviceCalendarEnabled,
           email: typeof data.email === "string" ? data.email : "",
         }),
       );
-    } catch (err) {
-      console.warn("No se pudo sincronizar perfil", err);
+    } catch {
+      void 0;
     }
-  }, [authHeaders, notifyApp, notifyEmail, visibility]);
+  }, [authHeaders, deviceCalendarEnabled, notifyApp, notifyEmail, visibility]);
 
   const fetchActivitiesRemote = useCallback(async () => {
     if (!authHeaders || !isClient) return;
@@ -1111,13 +1848,17 @@ export default function App() {
         : [];
       setCustomActivities(mapped);
       await AsyncStorage.setItem(STORAGE_ACTIVITIES, JSON.stringify(mapped));
-    } catch (err) {
-      console.warn("No se pudo sincronizar actividades", err);
+    } catch {
+      void 0;
     }
   }, [authHeaders, isClient]);
 
   const syncDeviceCalendar = useCallback(
     async (silent = false) => {
+      if (!deviceCalendarEnabled) {
+        setDeviceEvents([]);
+        return;
+      }
       try {
         const perm = await Calendar.requestCalendarPermissionsAsync();
         if (perm.status !== "granted") {
@@ -1166,7 +1907,7 @@ export default function App() {
         setIsSyncingCalendar(false);
       }
     },
-    [currentZone],
+    [currentZone, deviceCalendarEnabled],
   );
 
   const publishAvailability = useCallback(async () => {
@@ -1175,22 +1916,56 @@ export default function App() {
       Alert.alert("Selecciona negocio", "No se detecto negocio activo para publicar disponibilidad");
       return;
     }
+    if (!availabilityDays.length && !availabilityRangeDates.length) {
+      Alert.alert("Disponibilidad", "Selecciona al menos un día semanal o un rango de fechas.");
+      return;
+    }
     setIsSavingAvailability(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/businesses/${businessId}/rules`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ dayOfWeek: availabilityDay, startTime: availabilityStart, endTime: availabilityEnd }),
+      const requests: Promise<Response>[] = [];
+      availabilityDays.forEach((dayOfWeek) => {
+        requests.push(
+          fetch(`${API_BASE_URL}/businesses/${businessId}/rules`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            body: JSON.stringify({ dayOfWeek, startTime: availabilityStart, endTime: availabilityEnd }),
+          }),
+        );
       });
-      if (!res.ok) throw new Error(await res.text());
-      Alert.alert("Disponibilidad", "Horario publicado");
+      availabilityRangeDates.forEach((date) => {
+        requests.push(
+          fetch(`${API_BASE_URL}/businesses/${businessId}/exceptions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            body: JSON.stringify({ date, isClosed: false, startTime: availabilityStart, endTime: availabilityEnd }),
+          }),
+        );
+      });
+      const responses = await Promise.all(requests);
+      const failed = responses.find((res) => !res.ok);
+      if (failed) throw new Error(await failed.text());
+      Alert.alert(
+        "Disponibilidad",
+        `Horario publicado para ${availabilityDays.length} días semanales y ${availabilityRangeDates.length} fechas del rango.`,
+      );
+      setAvailabilityRangeStart(null);
+      setAvailabilityRangeEnd(null);
       setShowAvailabilityForm(false);
     } catch (err: unknown) {
       Alert.alert("Error", getErrorMessage(err, "No se pudo publicar"));
     } finally {
       setIsSavingAvailability(false);
     }
-  }, [activeBusinessId, authHeaders, availabilityDay, availabilityEnd, availabilityStart, myBusinesses, selectedBusiness]);
+  }, [
+    activeBusinessId,
+    authHeaders,
+    availabilityDays,
+    availabilityEnd,
+    availabilityRangeDates,
+    availabilityStart,
+    myBusinesses,
+    selectedBusiness,
+  ]);
 
   const createService = useCallback(async () => {
     const businessId = activeBusinessId ?? myBusinesses[0]?.id ?? selectedBusiness;
@@ -1243,37 +2018,78 @@ export default function App() {
     [activeBusinessId, authHeaders, fetchServices, myBusinesses, selectedBusiness],
   );
 
-  const saveSettings = useCallback(() => {
+  const saveSettings = useCallback(async () => {
     const businessId = activeBusinessId ?? myBusinesses[0]?.id ?? selectedBusiness;
+    setIsSavingSettings(true);
     if (!businessId) {
-      Alert.alert("Selecciona negocio", "No se detecto negocio activo para actualizar perfil");
+      if (!authHeaders) {
+        Alert.alert("Sesión requerida", "Inicia sesión como negocio para crear el perfil.");
+        setIsSavingSettings(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE_URL}/businesses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify({
+            name: settingsName || "Mi negocio",
+            category: settingsCategory || "Servicios",
+            phone: settingsPhone || undefined,
+            country: settingsCountry || undefined,
+            region: settingsRegion || undefined,
+            timezone: settingsTimezone || "UTC",
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const created: Business = await res.json();
+        setMyBusinesses((prev) => [created, ...prev]);
+        setBusinesses((prev) => [created, ...prev]);
+        setSelectedBusiness(created.id);
+        setSelectedTimezone(created.timezone || settingsTimezone || "UTC");
+        setShowSettingsForm(false);
+        setShowMenu(false);
+        Alert.alert("Negocio creado", "Perfil de negocio listo.");
+      } catch (err: unknown) {
+        Alert.alert("Error", getErrorMessage(err, "No se pudo crear el negocio"));
+      } finally {
+        setIsSavingSettings(false);
+      }
       return;
     }
-    setIsSavingSettings(true);
-    const updated = {
-      id: businessId,
-      name: settingsName || "Negocio",
-      category: settingsCategory || "Categoria",
-      timezone: settingsTimezone || "UTC",
-      phone: settingsPhone || "",
-      country: settingsCountry || "",
-      region: settingsRegion || "",
-      availabilityStart: settingsAvailabilityStart,
-      availabilityEnd: settingsAvailabilityEnd,
-    };
-    setMyBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, ...updated } : b)));
-    setBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, ...updated } : b)));
-    setSelectedTimezone(updated.timezone);
-    setShowSettingsForm(false);
-    setShowMenu(false);
-    Alert.alert("Configuracion", "Cambios guardados para esta sesion (se requiere endpoint PATCH para persistir).");
-    setIsSavingSettings(false);
+    try {
+      if (!authHeaders) {
+        throw new Error("Inicia sesión como negocio para guardar cambios.");
+      }
+      const res = await fetch(`${API_BASE_URL}/businesses/${businessId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({
+          name: settingsName || "Negocio",
+          category: settingsCategory || "Categoria",
+          timezone: settingsTimezone || "UTC",
+          phone: settingsPhone || null,
+          country: settingsCountry || null,
+          region: settingsRegion || null,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const updated: Business = await res.json();
+      setMyBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, ...updated } : b)));
+      setBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, ...updated } : b)));
+      setSelectedTimezone(updated.timezone || settingsTimezone || "UTC");
+      setShowSettingsForm(false);
+      setShowMenu(false);
+      Alert.alert("Configuración", "Cambios guardados.");
+    } catch (err: unknown) {
+      Alert.alert("Error", getErrorMessage(err, "No se pudo guardar la configuración"));
+    } finally {
+      setIsSavingSettings(false);
+    }
   }, [
     activeBusinessId,
+    authHeaders,
     myBusinesses,
     selectedBusiness,
-    settingsAvailabilityEnd,
-    settingsAvailabilityStart,
     settingsCategory,
     settingsCountry,
     settingsName,
@@ -1329,6 +2145,13 @@ export default function App() {
   }, [fetchActivitiesRemote, fetchBusinesses, fetchMyBusinesses, fetchProfile, isBusiness, isClient, token]);
 
   useEffect(() => {
+    if (!token) return;
+    if (!isClient && !isBusiness) return;
+    if (deviceLocation || isLocating || locationPermissionStatus === "denied") return;
+    detectDeviceLocation({ silent: true }).catch(() => undefined);
+  }, [detectDeviceLocation, deviceLocation, isBusiness, isClient, isLocating, locationPermissionStatus, token]);
+
+  useEffect(() => {
     const source = isBusiness ? myBusinesses : businesses;
     const found = source.find((b) => b.id === selectedBusiness) || source[0];
     if (found?.timezone) setSelectedTimezone(found.timezone);
@@ -1351,9 +2174,9 @@ export default function App() {
 
   useEffect(() => {
     if ((isClient && clientTab === "agenda") || isBusiness) {
-      syncDeviceCalendar(true);
+      if (deviceCalendarEnabled) syncDeviceCalendar(true);
     }
-  }, [clientTab, isBusiness, isClient, syncDeviceCalendar]);
+  }, [clientTab, deviceCalendarEnabled, isBusiness, isClient, syncDeviceCalendar]);
 
   useEffect(() => {
     if (!isBusiness || !selectedBusiness) return;
@@ -1380,7 +2203,7 @@ export default function App() {
     const refresh = () => {
       if (isAgenda) {
         fetchAppointments();
-        syncDeviceCalendar(true);
+        if (deviceCalendarEnabled) syncDeviceCalendar(true);
       } else if (isBiz) {
         fetchAppointments(selectedBusiness || undefined);
       }
@@ -1404,6 +2227,7 @@ export default function App() {
     };
   }, [
     clientTab,
+    deviceCalendarEnabled,
     fetchAppointments,
     isBusiness,
     isClient,
@@ -1461,6 +2285,7 @@ export default function App() {
           if (typeof parsed.notifyApp === "boolean") setNotifyApp(parsed.notifyApp);
           if (typeof parsed.notifyEmail === "boolean") setNotifyEmail(parsed.notifyEmail);
           if (typeof parsed.visibility === "boolean") setVisibility(parsed.visibility);
+          if (typeof parsed.deviceCalendarEnabled === "boolean") setDeviceCalendarEnabled(parsed.deviceCalendarEnabled);
           if (typeof parsed.email === "string") setNewEmail(parsed.email);
           if (parsed.email === null) setNewEmail("");
           if (typeof parsed.phone === "string") setProfilePhone(cleanOptionalText(parsed.phone));
@@ -1492,8 +2317,8 @@ export default function App() {
             prevApptStatusRef.current = parsed.prevApptStatus;
           }
         }
-      } catch (err) {
-        console.warn("No se pudo cargar perfil/actividades locales", err);
+      } catch {
+        void 0;
       }
     })();
   }, []);
@@ -1552,21 +2377,22 @@ export default function App() {
   }, [email, forgotEmail]);
 
   const handleSocialLogin = useCallback(
-    (provider: string) => {
-      // Integración OAuth real depende de las credenciales y deep links configurados.
-      const pretty =
-        provider === "line"
-          ? "LINE"
-          : provider === "whatsapp"
-            ? "WhatsApp"
-            : provider === "google"
-              ? "Google"
-              : provider === "ig"
-                ? "Instagram"
-                : "X";
-      Alert.alert("Social", `OAuth pendiente para ${pretty}.`);
+    async (provider: string) => {
+      if (provider === "google" || provider === "apple" || provider === "line" || provider === "x") {
+        await handleOAuthLogin(provider);
+        return;
+      }
+      if (provider === "ig") {
+        Alert.alert("Instagram", "Instagram requiere una integración aparte y no usa este mismo flujo OAuth/OIDC.");
+        return;
+      }
+      if (provider === "whatsapp") {
+        Alert.alert("WhatsApp", "WhatsApp no funciona como login OAuth estándar en esta app.");
+        return;
+      }
+      Alert.alert("Social", "Proveedor no soportado.");
     },
-    [],
+    [handleOAuthLogin],
   );
 
   const persistActivitiesLocal = useCallback((list: Activity[]) => {
@@ -1598,7 +2424,7 @@ export default function App() {
 
   const openNewActivityForm = useCallback(() => {
     resetActivityForm();
-    setFormSource("custom");
+    setFormSource(deviceCalendarEnabled ? "device" : "custom");
     const snapshot = {
       title: "Actividad",
       date: isoToday(),
@@ -1608,7 +2434,39 @@ export default function App() {
     };
     setInitialActivitySnapshot(snapshot);
     setShowNewActivityForm(true);
-  }, [resetActivityForm]);
+  }, [deviceCalendarEnabled, resetActivityForm]);
+
+  const deleteDeviceEvent = useCallback(
+    async (calEventId: string) => {
+      try {
+        const perm = await Calendar.requestCalendarPermissionsAsync();
+        if (perm.status !== "granted") {
+          Alert.alert("Permiso requerido", "Activa el acceso al calendario del dispositivo para eliminar eventos.");
+          return;
+        }
+        await Calendar.deleteEventAsync(calEventId);
+        if (deviceCalendarEnabled) await syncDeviceCalendar(true);
+        setAgendaPreview(null);
+        setShowNewActivityForm(false);
+        resetActivityForm();
+        setInitialActivitySnapshot(null);
+        Alert.alert("Eliminado", "Evento del calendario eliminado.");
+      } catch (err: unknown) {
+        Alert.alert("Calendario", getErrorMessage(err, "No se pudo eliminar el evento."));
+      }
+    },
+    [deviceCalendarEnabled, resetActivityForm, syncDeviceCalendar],
+  );
+
+  const confirmDeleteDeviceEvent = useCallback(
+    (calEventId: string) => {
+      Alert.alert("Eliminar evento", "¿Quieres eliminar este evento del calendario del dispositivo?", [
+        { text: "No", style: "cancel" },
+        { text: "Sí", style: "destructive", onPress: () => deleteDeviceEvent(calEventId) },
+      ]);
+    },
+    [deleteDeviceEvent],
+  );
 
   const openEditActivity = useCallback(
     (activity: Activity) => {
@@ -1707,7 +2565,7 @@ export default function App() {
           startDate: start.toJSDate(),
           endDate: end.toJSDate(),
         });
-        await syncDeviceCalendar(true);
+        if (deviceCalendarEnabled) await syncDeviceCalendar(true);
         Alert.alert("Actualizado", "Evento del calendario actualizado.");
         setShowNewActivityForm(false);
         resetActivityForm();
@@ -1719,6 +2577,7 @@ export default function App() {
       }
     }
     const isEditing = Boolean(editingActivityId);
+    const isCreatingDeviceEvent = !editingDeviceEventId;
     const existing = editingActivityId ? customActivities.find((c) => c.id === editingActivityId) : null;
     const activityKind = existing?.kind || "manual";
     const startISO = start.toISO() || `${newActivityDate}T${newActivityTime}`;
@@ -1731,6 +2590,39 @@ export default function App() {
       kind: activityKind,
       importance: newActivityImportance,
     };
+
+    if (isCreatingDeviceEvent) {
+      try {
+        const perm = await Calendar.requestCalendarPermissionsAsync();
+        if (perm.status !== "granted") {
+          Alert.alert("Permiso requerido", "Activa el acceso al calendario del dispositivo para crear eventos.");
+          return;
+        }
+        const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+        const writable = calendars.find((c) => c.allowsModifications) || calendars[0];
+        if (!writable?.id) {
+          Alert.alert("Calendario", "No se encontró un calendario disponible para guardar.");
+          return;
+        }
+        const end = start.plus({ minutes: editingDeviceDurationMin || 60 });
+        await Calendar.createEventAsync(writable.id, {
+          title: newActivityTitle || "Evento calendario",
+          notes: newActivityNote || undefined,
+          startDate: start.toJSDate(),
+          endDate: end.toJSDate(),
+          timeZone: currentZone,
+        });
+        if (deviceCalendarEnabled) await syncDeviceCalendar(true);
+        Alert.alert("Creado", "Evento agregado al calendario del dispositivo.");
+        setShowNewActivityForm(false);
+        resetActivityForm();
+        setInitialActivitySnapshot(null);
+        return;
+      } catch (err: unknown) {
+        Alert.alert("Calendario", getErrorMessage(err, "No se pudo crear el evento."));
+        return;
+      }
+    }
 
     setCustomActivities((prev) => {
       const next = isEditing ? prev.map((p) => (p.id === tempId ? { ...payload, id: p.id } : p)) : [payload, ...prev];
@@ -1775,8 +2667,8 @@ export default function App() {
             }
           }
         }
-      } catch (err) {
-        console.warn("No se pudo persistir actividad", err);
+      } catch {
+        void 0;
       }
     }
     Alert.alert(isEditing ? "Actividad actualizada" : "Actividad creada", isEditing ? "Se guardaron los cambios." : "Tu recordatorio se agregó a la agenda.");
@@ -1791,6 +2683,7 @@ export default function App() {
     editingActivityId,
     editingDeviceDurationMin,
     editingDeviceEventId,
+    deviceCalendarEnabled,
     formSource,
     initialActivitySnapshot,
     isDateSaturated,
@@ -1873,6 +2766,217 @@ export default function App() {
     setShowAvatarSheet(true);
   }, []);
 
+  const registerSheetNode = showRegisterSheet && (
+    <View style={styles.sheetOverlay}>
+      <Pressable
+        style={styles.sheetBackdrop}
+        onPress={() => {
+          setShowRegisterCountryPicker(false);
+          setShowRegisterSheet(false);
+        }}
+      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+        style={[styles.sheetCard, styles.registerSheetCard]}
+      >
+        <View style={styles.sheetHandle} />
+        <View style={styles.registerBody}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Crear cuenta</Text>
+            <Pressable
+              onPress={() => {
+                setShowRegisterCountryPicker(false);
+                setShowRegisterSheet(false);
+              }}
+              hitSlop={10}
+            >
+              <Ionicons name="close" size={20} color={palette.text} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            style={styles.registerScroll}
+            persistentScrollbar
+            showsVerticalScrollIndicator
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.registerFormContent}
+          >
+            <View style={styles.tabRow}>
+              {(["client", "business"] as UserKind[]).map((kind) => (
+                <Pressable
+                  key={kind}
+                  style={[
+                    styles.tabButton,
+                    kind === "client" ? styles.tabClient : styles.tabBusiness,
+                    registerKind === kind && styles.tabButtonActive,
+                    registerKind === kind && (kind === "client" ? styles.tabClientActive : styles.tabBusinessActive),
+                  ]}
+                  onPress={() => setRegisterKind(kind)}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      kind === "client" ? styles.tabClientText : styles.tabBusinessText,
+                      registerKind === kind && styles.tabTextActive,
+                    ]}
+                  >
+                    {kind === "client" ? "Cliente" : "Empresa"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {!registerKind && <Text style={styles.errorText}>Selecciona si quieres crear cuenta de Cliente o Empresa.</Text>}
+            <Text style={styles.fieldLabel}>Usuario</Text>
+            <TextInput style={[styles.input, styles.registerInput]} value={regName} onChangeText={setRegName} placeholder="Tu nombre" />
+
+            <Text style={styles.fieldLabel}>Correo</Text>
+            <TextInput
+              style={[styles.input, styles.registerInput]}
+              value={regEmail}
+              onChangeText={setRegEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="correo@ejemplo.com"
+            />
+
+            <Text style={styles.fieldLabel}>Contraseña</Text>
+            <TextInput
+              style={[styles.input, styles.registerInput]}
+              value={regPassword}
+              onChangeText={setRegPassword}
+              secureTextEntry
+              placeholder="Crea una contraseña"
+            />
+
+            <Text style={styles.fieldLabel}>País</Text>
+            <Pressable
+              style={[styles.input, styles.registerInput, styles.selectInput]}
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowRegisterCountryPicker(true);
+              }}
+            >
+              <Text style={[styles.selectInputText, !regCountry && styles.selectInputPlaceholder]}>
+                {regCountry || "Selecciona tu país"}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color={palette.muted} />
+            </Pressable>
+
+            {registerKind === "business" && (
+              <>
+                <Text style={styles.fieldLabel}>Nombre de la empresa</Text>
+                <TextInput
+                  style={[styles.input, styles.registerInput]}
+                  value={regBusinessName}
+                  onChangeText={setRegBusinessName}
+                  placeholder="Ej. Barbería Central"
+                />
+                <Text style={styles.fieldLabel}>Servicio que brinda</Text>
+                <TextInput
+                  style={[styles.input, styles.registerInput]}
+                  value={regBusinessService}
+                  onChangeText={setRegBusinessService}
+                  placeholder="Ej. Corte de cabello"
+                />
+              </>
+            )}
+
+            <View style={styles.row}>
+              <Pressable
+                style={({ pressed }) => [styles.secondaryButtonFull, pressed && styles.pressed, { flex: 1 }]}
+                onPress={() => {
+                  setShowRegisterCountryPicker(false);
+                  setShowRegisterSheet(false);
+                }}
+                disabled={isRegSubmitting}
+              >
+                <Text style={styles.buttonText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, { flex: 1 }]}
+                onPress={() => {
+                  if (!registerKind) {
+                    Alert.alert("Tipo de cuenta", "Selecciona si quieres crear cuenta de Cliente o Empresa.");
+                    return;
+                  }
+                  handleRegisterFromForm(registerKind);
+                }}
+                disabled={isRegSubmitting || !registerKind}
+              >
+                <Text style={styles.primaryButtonText}>{isRegSubmitting ? "Creando..." : "Crear"}</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+
+        <View style={styles.registerIntroCard}>
+          <View style={styles.registerIntroTop}>
+            <Text style={[styles.sheetTitle, styles.registerIntroTitle]}>Crear cuenta</Text>
+            <Text style={styles.registerIntroCopy}>Accede con tu proveedor social o completa el registro.</Text>
+          </View>
+          <View style={styles.registerSocialPanel}>
+            <Text style={styles.registerSocialTitle}>Sign in with Social Media</Text>
+            <View style={styles.socialRowCircle}>
+              {socialProviders.map((s) => (
+                <Pressable
+                  key={s.key}
+                  style={[styles.socialCircle, styles.registerSocialCircle, { borderColor: s.color, backgroundColor: "#fff" }]}
+                  onPress={() => handleSocialLogin(s.key)}
+                >
+                  <Text style={[styles.socialCircleText, { color: s.color }]}>{s.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+      {showRegisterCountryPicker && (
+        <View style={styles.inlinePickerOverlay}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setShowRegisterCountryPicker(false)} />
+          <View style={styles.inlinePickerCard}>
+            <View style={styles.inlinePickerHeader}>
+              <Text style={styles.sheetTitle}>Selecciona tu país</Text>
+              <Pressable onPress={() => setShowRegisterCountryPicker(false)} hitSlop={10}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.inlinePickerScroll}
+              persistentScrollbar
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {COUNTRY_OPTIONS.map((country) => {
+                const active = regCountry === country;
+                return (
+                  <Pressable
+                    key={country}
+                    style={({ pressed }) => [
+                      styles.inlinePickerItem,
+                      active && styles.inlinePickerItemActive,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => {
+                      setRegCountry(country);
+                      setShowRegisterCountryPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.inlinePickerItemText, active && styles.inlinePickerItemTextActive]}>{country}</Text>
+                    {active && <Ionicons name="checkmark" size={18} color={palette.accent} />}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+
 
 
   if (token && isBusiness && showSettingsForm) {
@@ -1881,98 +2985,179 @@ export default function App() {
         <SafeAreaProvider>
           <SafeAreaView style={styles.safe}>
             <StatusBar style="dark" />
-            <ScrollView contentContainerStyle={styles.container}>
+            <ScrollView contentContainerStyle={styles.container} nestedScrollEnabled keyboardShouldPersistTaps="handled">
               <View style={styles.card}>
               <View style={styles.rowBetween}>
-                <Text style={styles.sectionTitle}>Configuraciones</Text>
+                <Text style={styles.sectionTitle}>{myBusinesses.length === 0 ? "Crear negocio" : "Configuraciones"}</Text>
                 <Pressable onPress={() => setShowSettingsForm(false)}>
                   <Text style={styles.linkText}>Cerrar</Text>
                 </Pressable>
               </View>
               <Text style={styles.hint}>
-                Ajusta los datos visibles del negocio. (Persistencia real pendiente de endpoint PATCH en backend).
+                {myBusinesses.length === 0
+                  ? "Completa los datos básicos para crear tu negocio."
+                  : "Ajusta los datos visibles del negocio y su ubicación."}
               </Text>
-              <Text style={styles.fieldLabel}>Nombre del negocio</Text>
-              <TextInput style={styles.input} value={settingsName} onChangeText={setSettingsName} placeholder="Nombre del negocio" />
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>Nombre del negocio</Text>
+                <TextInput
+                  style={[styles.input, styles.settingsInput]}
+                  value={settingsName}
+                  onChangeText={setSettingsName}
+                  placeholder="Nombre del negocio"
+                />
+              </View>
 
-              <Text style={styles.fieldLabel}>Categoria</Text>
-              <TextInput style={styles.input} value={settingsCategory} onChangeText={setSettingsCategory} placeholder="Categoria" />
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>Categoria</Text>
+                <TextInput
+                  style={[styles.input, styles.settingsInput]}
+                  value={settingsCategory}
+                  onChangeText={setSettingsCategory}
+                  placeholder="Categoria"
+                />
+              </View>
 
-              <Text style={styles.fieldLabel}>Zona horaria (lista sugerida)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
-                {defaultTimezones.map((tz) => (
-                  <Pressable
-                    key={tz}
-                    style={[styles.chip, settingsTimezone === tz && styles.chipActive]}
-                    onPress={() => setSettingsTimezone(tz)}
-                  >
-                    <Text style={[styles.chipText, settingsTimezone === tz && styles.chipTextActive]}>{tz}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <TextInput
-                style={styles.input}
-                value={settingsTimezone}
-                onChangeText={setSettingsTimezone}
-                placeholder="Zona horaria (e.g. Asia/Tokyo)"
-              />
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>Zona horaria</Text>
+                <Pressable style={[styles.input, styles.settingsInput, styles.selectInput]} onPress={() => setShowSettingsPicker("timezone")}>
+                  <Text style={[styles.selectInputText, !settingsTimezone && styles.selectInputPlaceholder]}>
+                    {settingsTimezone || "Selecciona la zona horaria"}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={palette.muted} />
+                </Pressable>
+              </View>
 
-              <Text style={styles.fieldLabel}>Telefono (elige codigo y completa)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
-                {phoneCodes.map((code) => (
-                  <Pressable
-                    key={code}
-                    style={[styles.chip, settingsPhone?.startsWith(code) && styles.chipActive]}
-                    onPress={() => setSettingsPhone(code)}
-                  >
-                    <Text style={[styles.chipText, settingsPhone?.startsWith(code) && styles.chipTextActive]}>{code}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <TextInput style={styles.input} value={settingsPhone} onChangeText={setSettingsPhone} placeholder="Telefono con codigo" keyboardType="phone-pad" />
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>Código telefónico</Text>
+                <Pressable style={[styles.input, styles.settingsInput, styles.selectInput]} onPress={() => setShowSettingsPicker("phoneCode")}>
+                  <Text style={[styles.selectInputText, !settingsPhoneCode && styles.selectInputPlaceholder]}>
+                    {settingsPhoneCode || "Selecciona el código"}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={palette.muted} />
+                </Pressable>
+              </View>
 
-              <Text style={styles.fieldLabel}>Pais (Asia)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
-                {asiaCountries.map((c) => (
-                  <Pressable
-                    key={c}
-                    style={[styles.chip, settingsCountry === c && styles.chipActive]}
-                    onPress={() => setSettingsCountry(c)}
-                  >
-                    <Text style={[styles.chipText, settingsCountry === c && styles.chipTextActive]}>{c}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <TextInput style={styles.input} value={settingsCountry} onChangeText={setSettingsCountry} placeholder="Pais" />
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>Teléfono</Text>
+                <TextInput
+                  style={[styles.input, styles.settingsInput]}
+                  value={settingsPhoneNumber}
+                  onChangeText={setSettingsPhoneNumber}
+                  placeholder="Número de teléfono"
+                  keyboardType="phone-pad"
+                />
+              </View>
 
-              <Text style={styles.fieldLabel}>Region/Estado</Text>
-              <TextInput style={styles.input} value={settingsRegion} onChangeText={setSettingsRegion} placeholder="Region/Estado" />
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>País</Text>
+                <Pressable style={[styles.input, styles.settingsInput, styles.selectInput]} onPress={() => setShowSettingsPicker("country")}>
+                  <Text style={[styles.selectInputText, !settingsCountry && styles.selectInputPlaceholder]}>
+                    {settingsCountry || "Selecciona el país"}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={palette.muted} />
+                </Pressable>
+              </View>
+
+              <View style={styles.settingsFieldWrap}>
+                <Text style={styles.fieldLabel}>Region/Estado</Text>
+                <TextInput
+                  style={[styles.input, styles.settingsInput]}
+                  value={settingsRegion}
+                  onChangeText={setSettingsRegion}
+                  placeholder="Region/Estado"
+                />
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.secondaryButtonFull, pressed && styles.pressed]}
+                onPress={() => detectDeviceLocation({ applyToBusinessSettings: true })}
+              >
+                <Text style={styles.buttonText}>{isLocating ? "Detectando ubicación..." : "Usar mi ubicación actual"}</Text>
+              </Pressable>
+              {deviceLocation && (
+                <Text style={styles.hint}>
+                  Detectado: {deviceLocation.region ? `${deviceLocation.region}, ` : ""}
+                  {deviceLocation.country}
+                </Text>
+              )}
 
               <Text style={styles.fieldLabel}>Horario de atencion</Text>
-              <View style={styles.row}>
+              <View style={styles.settingsTimeRow}>
                 <TextInput
-                  style={[styles.input, { flex: 1 }]}
+                  style={[styles.input, styles.settingsTimeInput]}
                   value={settingsAvailabilityStart}
                   onChangeText={setSettingsAvailabilityStart}
                   placeholder="HH:MM inicio"
                 />
                 <TextInput
-                  style={[styles.input, { flex: 1 }]}
+                  style={[styles.input, styles.settingsTimeInput]}
                   value={settingsAvailabilityEnd}
                   onChangeText={setSettingsAvailabilityEnd}
                   placeholder="HH:MM fin"
                 />
               </View>
-<Pressable
+              <Pressable
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
                 onPress={saveSettings}
                 disabled={isSavingSettings}
               >
                 <Text style={styles.primaryButtonText}>
-                  {isSavingSettings ? "Guardando..." : "Guardar cambios"}
+                  {isSavingSettings ? "Guardando..." : myBusinesses.length === 0 ? "Crear negocio" : "Guardar cambios"}
                 </Text>
               </Pressable>
               </View>
+              {showSettingsPicker && (
+                <View style={styles.inlinePickerOverlay}>
+                  <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setShowSettingsPicker(null)} />
+                  <View style={styles.inlinePickerCard}>
+                    <View style={styles.inlinePickerHeader}>
+                      <Text style={styles.sheetTitle}>{settingsPickerTitle}</Text>
+                      <Pressable onPress={() => setShowSettingsPicker(null)} hitSlop={10}>
+                        <Ionicons name="close" size={20} color={palette.text} />
+                      </Pressable>
+                    </View>
+                    <ScrollView
+                      style={styles.inlinePickerScroll}
+                      persistentScrollbar
+                      showsVerticalScrollIndicator
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {settingsPickerOptions.map((option) => {
+                        const active =
+                          showSettingsPicker === "timezone"
+                            ? settingsTimezone === option
+                            : showSettingsPicker === "country"
+                              ? settingsCountry === option
+                              : settingsPhoneCode === option;
+                        return (
+                          <Pressable
+                            key={option}
+                            style={({ pressed }) => [
+                              styles.inlinePickerItem,
+                              active && styles.inlinePickerItemActive,
+                              pressed && styles.pressed,
+                            ]}
+                            onPress={() => {
+                              if (showSettingsPicker === "timezone") {
+                                setSettingsTimezone(option);
+                              } else if (showSettingsPicker === "country") {
+                                setSettingsCountry(option);
+                              } else {
+                                setSettingsPhoneCode(option);
+                              }
+                              setShowSettingsPicker(null);
+                            }}
+                          >
+                            <Text style={[styles.inlinePickerItemText, active && styles.inlinePickerItemTextActive]}>{option}</Text>
+                            {active && <Ionicons name="checkmark" size={18} color={palette.accent} />}
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
             </ScrollView>
           </SafeAreaView>
         </SafeAreaProvider>
@@ -1984,34 +3169,33 @@ export default function App() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <LinearGradient colors={["#0da2ff", "#0c5be9"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.fullBackground}>
+          <LinearGradient colors={["#75cf84", "#2f8f4e"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.fullBackground}>
             <SafeAreaView style={styles.safeLogin}>
               <StatusBar style="light" />
-              <ScrollView contentContainerStyle={styles.loginFull}>
+              <ScrollView contentContainerStyle={styles.loginFull} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                 <View style={styles.loginWaveTop} />
                 <View style={styles.loginWaveBottom} />
                 <View style={styles.loginCardMock}>
                   <View style={styles.loginLogo}>
-                    <Image source={mainLogo} style={styles.loginMainLogo} />
+                    <MelonLogo size={86} />
                   </View>
-                  <Text style={styles.loginTitleCenter}>Schedly</Text>
+                  <Text style={styles.loginTitleCenter}>Melon</Text>
                   <Text style={styles.loginSubtitleCenter}>Agenda tus Citas</Text>
                   <View style={styles.formGap}>
                   <View style={styles.inputPillWhite}>
                     <TextInput
                       placeholder="User Name"
-                      placeholderTextColor="#1d4ed8"
+                      placeholderTextColor="#2f8f4e"
                       style={styles.inputPillFieldWhite}
                       autoCapitalize="none"
                       value={email}
                       onChangeText={setEmail}
                     />
-                    <Text style={styles.inputPillIconBlue}>??</Text>
                   </View>
                   <View style={styles.inputPillWhite}>
                     <TextInput
                       placeholder="Password"
-                      placeholderTextColor="#1d4ed8"
+                      placeholderTextColor="#2f8f4e"
                       style={[styles.inputPillFieldWhite, { flex: 1 }]}
                       secureTextEntry={!showPassword}
                       value={password}
@@ -2033,7 +3217,7 @@ export default function App() {
                 </View>
                 <View style={styles.loginHelpers}>
                   <Pressable style={styles.rememberRow} onPress={() => setRememberMe((v) => !v)}>
-                    <View style={[styles.rememberBox, rememberMe && styles.rememberBoxOn, { borderColor: "#1d4ed8" }]}>
+                    <View style={[styles.rememberBox, rememberMe && styles.rememberBoxOn, { borderColor: "#2f8f4e" }]}>
                       {rememberMe && <Text style={styles.rememberCheck}>✓</Text>}
                     </View>
                     <Text style={[styles.loginHint, { color: "#FFFFFF" }]}>Remember Password</Text>
@@ -2062,76 +3246,72 @@ export default function App() {
                     </Pressable>
                   </View>
                 )}
+            <Pressable
+              style={({ pressed }) => [styles.loginCta, pressed && styles.pressed]}
+              onPress={() => {
+                // Ensure registration flow only happens from the "Crear" button in the register sheet.
+                setShowRegisterSheet(false);
+                handleLogin();
+              }}
+              disabled={isAuthLoading}
+            >
+              <Text style={styles.loginCtaText}>{isAuthLoading ? "Starting..." : "Sign in"}</Text>
+            </Pressable>
+
+            {oauthEnabled && (
+              <Pressable
+                style={({ pressed }) => [styles.oauthButton, pressed && styles.pressed]}
+                onPress={() => handleOAuthLogin("kazehana")}
+                disabled={isAuthLoading}
+              >
+                <View style={styles.oauthButtonRow}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#fff" />
+                  <Text style={styles.oauthButtonText}>Continuar con KazehanaCloud</Text>
+                </View>
+              </Pressable>
+            )}
+
+            <View style={styles.loginSocialBlock}>
+              <Text style={[styles.loginHint, { textAlign: "center", color: "#FFFFFF" }]}>Sign in with Social Media</Text>
+              <View style={styles.socialRowCircle}>
+                {socialProviders.map((s) => (
                   <Pressable
-                    style={({ pressed }) => [styles.loginCta, pressed && styles.pressed]}
-                    onPress={() => {
-                      // Ensure registration flow only happens from the "Crear" button in the register sheet.
-                      setShowRegisterSheet(false);
-                      handleLogin(accessKind);
-                    }}
-                    disabled={isAuthLoading}
+                    key={s.key}
+                    style={[styles.socialCircle, { borderColor: s.color }]}
+                    onPress={() => handleSocialLogin(s.key)}
                   >
-                    <Text style={styles.loginCtaText}>{isAuthLoading ? "Starting..." : "Sign in"}</Text>
+                    <Text style={[styles.socialCircleText, { color: "#FFFFFF" }]}>{s.label}</Text>
                   </Pressable>
-                  <View style={[styles.tabRow, { marginTop: 6 }]}>
-                    {(["client", "business"] as UserKind[]).map((kind) => (
-                      <Pressable
-                        key={kind}
-                        style={[
-                          styles.tabButton,
-                          kind === "client" ? styles.tabClient : styles.tabBusiness,
-                          accessKind === kind && styles.tabButtonActive,
-                          accessKind === kind && (kind === "client" ? styles.tabClientActive : styles.tabBusinessActive),
-                        ]}
-                        onPress={() => setAccessKind(kind)}
-                      >
-                        <Text
-                          style={[
-                            styles.tabText,
-                            kind === "client" ? styles.tabClientText : styles.tabBusinessText,
-                            accessKind === kind && styles.tabTextActive,
-                          ]}
-                        >
-                          {kind === "client" ? "Cliente" : "Empresa"}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Text style={[styles.loginHint, { textAlign: "center", color: "#1d4ed8", marginTop: 160 }]}>Sign in with Social Media</Text>
-                  <View style={styles.socialRowCircle}>
-                    {socialProviders.map((s) => (
-                      <Pressable
-                        key={s.key}
-                        style={[styles.socialCircle, { borderColor: s.color }]}
-                        onPress={() => handleSocialLogin(s.key)}
-                      >
-                        <Text style={[styles.socialCircleText, { color: s.color }]}>{s.label}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                <Pressable
-                  style={{ marginTop: 10 }}
-                  onPress={() => {
-                    setRegName("");
-                    setRegEmail(email);
-                    setRegPassword(password);
-                    setRegCountry("");
-                    try {
-                      setRegTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-                    } catch {
-                      setRegTimezone("UTC");
-                    }
-                    setShowRegisterSheet(true);
-                  }}
-                >
-                  <Text style={[styles.loginLink, { color: "#0d6efd" }]}>
-                    No tienes cuenta? Crea una
-                  </Text>
-                </Pressable>
+                ))}
+              </View>
+              <Pressable
+                style={{ marginTop: 10 }}
+                onPress={() => {
+                  setRegisterKind(null);
+                  setRegName("");
+                  setRegEmail("");
+                  setRegPassword("");
+                  setRegCountry("");
+                  try {
+                    setRegTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+                  } catch {
+                    setRegTimezone("UTC");
+                  }
+                  setRegBusinessName("");
+                  setRegBusinessService("");
+                  setShowRegisterSheet(true);
+                }}
+              >
+                <Text style={[styles.loginLink, { color: "#FFFFFF" }]}>
+                  No tienes cuenta? Crea una
+                </Text>
+              </Pressable>
+            </View>
                 </View>
               </ScrollView>
             </SafeAreaView>
           </LinearGradient>
+          {registerSheetNode}
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -2143,12 +3323,12 @@ export default function App() {
       <SafeAreaProvider>
         <SafeAreaView style={styles.safe}>
           <StatusBar style="dark" />
-        <ScrollView contentContainerStyle={styles.container}>
+            <ScrollView contentContainerStyle={styles.container} nestedScrollEnabled keyboardShouldPersistTaps="handled">
           <View style={{ gap: 16 }}>
                 <View style={styles.brandRow}>
                   <View style={styles.brandTitleRow}>
-                    <Image source={mainLogo} style={styles.brandTitleLogo} />
-                    <Text style={styles.brandTitle}>Schedly</Text>
+                    <MelonLogo size={50} />
+                    <Text style={styles.brandTitle}>Melon</Text>
                   </View>
                   <Text style={styles.brandSubtitle}>Agenda segura y separada por negocio</Text>
                 </View>
@@ -2241,7 +3421,7 @@ export default function App() {
                             logout();
                           }}
                         >
-                          <Text style={styles.menuText}>Logout</Text>
+                          <Text style={styles.menuText}>Log out</Text>
                         </Pressable>
                       </View>
                     )}
@@ -2293,12 +3473,41 @@ export default function App() {
                           onChangeText={setSearchTerm}
                           placeholder="Busca por nombre de empresa o tipo de servicio"
                         />
+                        <View style={styles.locationBar}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.locationBarTitle}>Ubicación actual</Text>
+                            <Text style={styles.locationBarText}>
+                              {deviceLocation
+                                ? `${deviceLocation.region ? `${deviceLocation.region}, ` : ""}${deviceLocation.country || "Ubicación detectada"}`
+                                : locationPermissionStatus === "denied"
+                                  ? "Permiso denegado"
+                                  : isLocating
+                                    ? "Detectando ubicación..."
+                                    : "Sin ubicación detectada"}
+                            </Text>
+                          </View>
+                          <Pressable
+                            style={({ pressed }) => [styles.locationRefreshButton, pressed && styles.pressed]}
+                            onPress={() => detectDeviceLocation()}
+                          >
+                            <Ionicons name="locate-outline" size={16} color="#fff" />
+                            <Text style={styles.locationRefreshText}>{isLocating ? "Buscando" : "Actualizar"}</Text>
+                          </Pressable>
+                        </View>
+                        {!!locationError && <Text style={styles.errorText}>{locationError}</Text>}
                       </Section>
                     </View>
 
                     <View style={styles.card}>
                       <Section title="Destacados">
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll} contentContainerStyle={{ gap: 12 }}>
+                        <ScrollView
+                          horizontal
+                          nestedScrollEnabled
+                          keyboardShouldPersistTaps="handled"
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.rowScroll}
+                          contentContainerStyle={{ gap: 12 }}
+                        >
                           {filteredBusinesses.slice(0, 5).map((b) => (
                             <Pressable
                               key={b.id}
@@ -2312,9 +3521,25 @@ export default function App() {
                                 if (b.timezone) setSelectedTimezone(b.timezone);
                               }}
                             >
-                              <Text style={styles.highlightTitle}>{b.name}</Text>
-                              <Text style={styles.subtitle}>{b.category || "Sin categoría"}</Text>
-                              <Text style={styles.hint}>{b.timezone || "Zona horaria no definida"}</Text>
+                              {b.owner?.avatarUrl ? (
+                                <ImageBackground source={{ uri: b.owner.avatarUrl }} style={styles.businessCardBackground} imageStyle={styles.businessCardBackgroundImage}>
+                                  <View style={styles.businessCardOverlay} />
+                                  <View style={styles.businessCardContent}>
+                                    <Text style={styles.businessCardTitle}>{b.name}</Text>
+                                    <Text style={styles.businessCardSubtitle}>{b.category || "Sin categoría"}</Text>
+                                  </View>
+                                </ImageBackground>
+                              ) : (
+                                <View style={styles.businessCardContent}>
+                                  <View style={styles.businessLogoFallback}>
+                                    <Text style={styles.businessLogoText}>{initialsFromName(b.name)}</Text>
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.highlightTitle}>{b.name}</Text>
+                                    <Text style={styles.subtitle}>{b.category || "Sin categoría"}</Text>
+                                  </View>
+                                </View>
+                              )}
                             </Pressable>
                           ))}
                           {!filteredBusinesses.length && <Text style={styles.label}>Aún sin negocios destacados.</Text>}
@@ -2338,11 +3563,33 @@ export default function App() {
                                 if (b.timezone) setSelectedTimezone(b.timezone);
                               }}
                             >
-                              <Text style={styles.highlightTitle}>{b.name}</Text>
-                              <Text style={styles.subtitle}>{b.category || "Sin categoría"}</Text>
-                              <Text style={styles.hint} numberOfLines={1}>
-                                {b.timezone || "Zona horaria"}
-                              </Text>
+                              {b.owner?.avatarUrl ? (
+                                <ImageBackground source={{ uri: b.owner.avatarUrl }} style={styles.squareCardBackground} imageStyle={styles.businessCardBackgroundImage}>
+                                  <View style={styles.businessCardOverlay} />
+                                  <View style={styles.squareCardContent}>
+                                    <Text style={styles.businessCardTitle} numberOfLines={1}>
+                                      {b.name}
+                                    </Text>
+                                    <Text style={styles.businessCardSubtitle} numberOfLines={1}>
+                                      {b.category || "Sin categoría"}
+                                    </Text>
+                                  </View>
+                                </ImageBackground>
+                              ) : (
+                                <View style={styles.squareCardContent}>
+                                  <View style={styles.businessLogoFallbackSm}>
+                                    <Text style={styles.businessLogoTextSm}>{initialsFromName(b.name)}</Text>
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.highlightTitle} numberOfLines={1}>
+                                      {b.name}
+                                    </Text>
+                                    <Text style={styles.subtitle} numberOfLines={1}>
+                                      {b.category || "Sin categoría"}
+                                    </Text>
+                                  </View>
+                                </View>
+                              )}
                             </Pressable>
                           ))}
                           {!filteredBusinesses.length && <Text style={styles.label}>No se encontraron negocios.</Text>}
@@ -2360,9 +3607,11 @@ export default function App() {
                         <Pressable
                           style={[styles.button, { paddingVertical: 8, paddingHorizontal: 10 }]}
                           onPress={() => syncDeviceCalendar(false)}
-                          disabled={isSyncingCalendar}
+                          disabled={isSyncingCalendar || !deviceCalendarEnabled}
                         >
-                          <Text style={styles.buttonText}>{isSyncingCalendar ? "Sincronizando..." : "Sincronizar"}</Text>
+                          <Text style={styles.buttonText}>
+                            {!deviceCalendarEnabled ? "Calendario desactivado" : isSyncingCalendar ? "Sincronizando..." : "Sincronizar"}
+                          </Text>
                         </Pressable>
                       </View>
                       <View style={[styles.row, { marginTop: 10 }]}>
@@ -2405,10 +3654,14 @@ export default function App() {
                         showsVerticalScrollIndicator
                       >
                         {filteredSchedule.map((item) => {
-                          const tone =
+                          const isDevice = item.source === "device";
+                          const urgencyTone =
                             item.kind === "manual"
                               ? importanceColors[(item.importance as Importance) || "medium"]
                               : statusColor(item.status);
+                          const tone = isDevice ? "#9ca3af" : urgencyTone;
+                          const dotTone = isDevice ? urgencyTone : tone;
+                          const statusTone = isDevice ? "#6b7280" : statusColor(item.status);
                           const importanceLabel = importanceLabels[(item.importance as Importance) || "medium"];
                           const isCustomReminder = item.source === "custom";
                           const isAppointment = item.source === "appointment";
@@ -2417,6 +3670,7 @@ export default function App() {
                               style={({ pressed }) => [
                                 styles.sessionRow,
                                 { borderLeftWidth: 6, borderLeftColor: tone },
+                                isDevice && [styles.deviceAgendaCard, { borderTopColor: urgencyTone }],
                                 pressed && styles.pressed,
                               ]}
                               onPress={() => openAgendaPreview(item.source as ScheduleSource, item.id)}
@@ -2425,7 +3679,7 @@ export default function App() {
                               <View style={{ flex: 1, gap: 4 }}>
                                 <View style={styles.rowBetween}>
                                   <Text style={styles.highlightTitle}>{item.title}</Text>
-                                  <View style={[styles.importanceDot, { backgroundColor: tone }]} />
+                                  <View style={[styles.importanceDot, { backgroundColor: dotTone }]} />
                                 </View>
                                 <Text style={styles.subtitle}>
                                   {item.subtitle || (item.kind === "cita" ? "Cita" : "Actividad")}
@@ -2438,8 +3692,8 @@ export default function App() {
                                     <Text style={[styles.tagText, { color: tone }]}>{importanceLabel}</Text>
                                   </View>
                                 )}
-                                <View style={[styles.tag, { borderColor: statusColor(item.status) }]}>
-                                  <Text style={[styles.tagText, { color: statusColor(item.status) }]}>
+                                <View style={[styles.tag, { borderColor: statusTone }]}>
+                                  <Text style={[styles.tagText, { color: statusTone }]}>
                                     {prettyStatus(item.status)}
                                   </Text>
                                 </View>
@@ -2496,78 +3750,141 @@ export default function App() {
               <View style={[styles.card, showMenu ? styles.cardMenuOpen : null]}>
                 {myBusinesses.length === 0 ? (
                   <Section title="Configurar negocio">
-                    <Text style={styles.label}>Crea tu negocio para ofrecer servicios a los clientes.</Text>
-                    <TextInput style={styles.input} value={businessName} onChangeText={setBusinessName} placeholder="Nombre del negocio" />
-                    <TextInput style={styles.input} value={businessCategory} onChangeText={setBusinessCategory} placeholder="Categoría" />
-                    <TextInput style={styles.input} value={businessPhone} onChangeText={setBusinessPhone} placeholder="Teléfono (opcional)" />
-                    <TextInput style={styles.input} value={businessAddress} onChangeText={setBusinessAddress} placeholder="Dirección (opcional)" />
+                    <Text style={styles.label}>Completa tu negocio desde Configuraciones para comenzar a ofrecer servicios.</Text>
                     <Pressable
                       style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-                      onPress={createBusinessProfile}
-                      disabled={isCreatingBusiness}
+                      onPress={() => {
+                        setSettingsName("Mi negocio");
+                        setSettingsCategory("Servicios");
+                        setSettingsTimezone(selectedTimezone || "UTC");
+                        setSettingsPhoneCode("");
+                        setSettingsPhoneNumber("");
+                        setSettingsCountry("");
+                        setSettingsRegion("");
+                        setSettingsAvailabilityStart("09:00");
+                        setSettingsAvailabilityEnd("18:00");
+                        setShowSettingsForm(true);
+                      }}
                     >
-                      <Text style={styles.primaryButtonText}>{isCreatingBusiness ? "Creando..." : "Crear negocio"}</Text>
+                      <Text style={styles.primaryButtonText}>Ir a configuraciones</Text>
                     </Pressable>
                   </Section>
                 ) : (
                   <>
-                    <View style={styles.profileRow}>
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{initialsFromName(selectedBusinessData?.name)}</Text>
-                      </View>
+                      <View style={styles.profileRow}>
+                      <Pressable style={styles.avatar} onPress={openProfile}>
+                        {avatarUri ? (
+                          <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                        ) : (
+                          <Text style={styles.avatarText}>{initialsFromName(selectedBusinessData?.name)}</Text>
+                        )}
+                      </Pressable>
                       <View style={{ flex: 1, gap: 4 }}>
                         <Text style={styles.title}>{selectedBusinessData?.name || "Negocio"}</Text>
                         <Text style={styles.subtitle}>{selectedBusinessData?.category || "Categoria"}</Text>
                         <Text style={styles.hint}>{selectedBusinessData?.timezone || "Zona horaria"}</Text>
                       </View>
-                      <View style={styles.menuAnchor}>
-                        <Pressable style={styles.menuButton} onPress={() => setShowMenu((v) => !v)}>
-                          <Text style={styles.menuButtonText}>?</Text>
+                      <View style={styles.topRightButtons}>
+                        <Pressable
+                          style={styles.menuButton}
+                          onPress={openNotifications}
+                          hitSlop={10}
+                          accessibilityRole="button"
+                          accessibilityLabel="Notificaciones"
+                        >
+                          <Ionicons name="notifications-outline" size={18} color={palette.accent} />
+                          {unreadCount > 0 && (
+                            <View style={styles.badgeDot}>
+                              <Text style={styles.badgeDotText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
+                            </View>
+                          )}
                         </Pressable>
-                        {showMenu && (
-                          <View style={styles.menu}>
-                            <Pressable
-                              style={styles.menuItem}
-                              onPress={() => {
-                                setShowMenu(false);
-                                Alert.alert("Publicidad", "Opción de anuncios se activará en la versión web.");
-                              }}
-                            >
-                              <Text style={styles.menuText}>Publicidad</Text>
-                            </Pressable>
-                            <Pressable
-                              style={styles.menuItem}
-                              onPress={() => {
-                                setShowMenu(false);
-                                setSettingsName(selectedBusinessData?.name || "");
-                                setSettingsCategory(selectedBusinessData?.category || "");
-                                setSettingsTimezone(selectedBusinessData?.timezone || "UTC");
-                                setSettingsPhone(selectedBusinessData?.phone || "");
-                                setSettingsCountry(selectedBusinessData?.country || "");
-                                setSettingsRegion(selectedBusinessData?.region || "");
-                                setSettingsAvailabilityStart(availabilityStart);
-                                setSettingsAvailabilityEnd(availabilityEnd);
-                                setShowSettingsForm(true);
-                              }}
-                            >
-                              <Text style={styles.menuText}>Configuraciones</Text>
-                            </Pressable>
-                            <Pressable
-                              style={styles.menuItem}
-                              onPress={() => {
-                                setShowMenu(false);
-                                logout();
-                              }}
-                            >
-                              <Text style={styles.menuText}>Logout</Text>
-                            </Pressable>
-                          </View>
-                        )}
+                        <View style={styles.menuAnchor}>
+                          <Pressable style={styles.menuButton} onPress={() => setShowMenu((v) => !v)}>
+                            <Ionicons name="settings-outline" size={18} color={palette.accent} />
+                          </Pressable>
+                          {showMenu && (
+                            <View style={styles.menu}>
+                              <Pressable
+                                style={styles.menuItem}
+                                onPress={() => {
+                                  setShowMenu(false);
+                                  openProfile();
+                                }}
+                              >
+                                <View style={styles.menuItemRow}>
+                                  <Ionicons name="person-outline" size={16} color={palette.text} />
+                                  <Text style={styles.menuText}>Perfil</Text>
+                                </View>
+                              </Pressable>
+                              <Pressable
+                                style={styles.menuItem}
+                                onPress={() => {
+                                  setShowMenu(false);
+                                  setSettingsName(selectedBusinessData?.name || "");
+                                  setSettingsCategory(selectedBusinessData?.category || "");
+                                  setSettingsTimezone(selectedBusinessData?.timezone || "UTC");
+                                  {
+                                    const phoneParts = splitPhoneParts(selectedBusinessData?.phone || "");
+                                    setSettingsPhoneCode(phoneParts.code);
+                                    setSettingsPhoneNumber(phoneParts.number);
+                                  }
+                                  setSettingsCountry(selectedBusinessData?.country || "");
+                                  setSettingsRegion(selectedBusinessData?.region || "");
+                                  setSettingsAvailabilityStart(availabilityStart);
+                                  setSettingsAvailabilityEnd(availabilityEnd);
+                                  setShowSettingsForm(true);
+                                }}
+                              >
+                                <View style={styles.menuItemRow}>
+                                  <Ionicons name="settings-outline" size={16} color={palette.text} />
+                                  <Text style={styles.menuText}>Configuraciones</Text>
+                                </View>
+                              </Pressable>
+                              <Pressable
+                                style={styles.menuItem}
+                                onPress={() => {
+                                  setShowMenu(false);
+                                  setLegalModal("terms");
+                                }}
+                              >
+                                <View style={styles.menuItemRow}>
+                                  <Ionicons name="document-text-outline" size={16} color={palette.text} />
+                                  <Text style={styles.menuText}>Términos</Text>
+                                </View>
+                              </Pressable>
+                              <Pressable
+                                style={styles.menuItem}
+                                onPress={() => {
+                                  setShowMenu(false);
+                                  setLegalModal("privacy");
+                                }}
+                              >
+                                <View style={styles.menuItemRow}>
+                                  <Ionicons name="shield-checkmark-outline" size={16} color={palette.text} />
+                                  <Text style={styles.menuText}>Privacidad</Text>
+                                </View>
+                              </Pressable>
+                              <Pressable
+                                style={styles.menuItem}
+                                onPress={() => {
+                                  setShowMenu(false);
+                                  logout();
+                                }}
+                              >
+                                <View style={styles.menuItemRow}>
+                                  <Ionicons name="log-out-outline" size={16} color={palette.text} />
+                                  <Text style={styles.menuText}>Log out</Text>
+                                </View>
+                              </Pressable>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     </View>
 
                     <Section title="Mis negocios">
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
+                      <ScrollView horizontal nestedScrollEnabled keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
                         {myBusinesses.map((b) => (
                           <Pressable
                             key={b.id}
@@ -2585,7 +3902,7 @@ export default function App() {
                     </Section>
 
                     <Section title="Servicios predefinidos">
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
+                      <ScrollView horizontal nestedScrollEnabled keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
                         {serviceTemplates.map((tpl) => (
                           <Pressable
                             key={tpl.name + tpl.durationMin}
@@ -2677,33 +3994,78 @@ export default function App() {
 
                     {showAvailabilityForm && (
                       <Section title="Publicar disponibilidad">
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
+                        <Text style={styles.fieldLabel}>Días semanales</Text>
+                        <ScrollView horizontal nestedScrollEnabled keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} style={styles.rowScroll}>
                           {[0, 1, 2, 3, 4, 5, 6].map((d) => (
                             <Pressable
                               key={d}
-                              style={[styles.chip, availabilityDay === d && styles.chipActive]}
-                              onPress={() => setAvailabilityDay(d)}
+                              style={[styles.chip, availabilityDays.includes(d) && styles.chipActive]}
+                              onPress={() =>
+                                setAvailabilityDays((prev) =>
+                                  prev.includes(d) ? prev.filter((item) => item !== d) : [...prev, d].sort((a, b) => a - b),
+                                )
+                              }
                             >
-                              <Text style={[styles.chipText, availabilityDay === d && styles.chipTextActive]}>
+                              <Text style={[styles.chipText, availabilityDays.includes(d) && styles.chipTextActive]}>
                                 {["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][d]}
                               </Text>
                             </Pressable>
                           ))}
                         </ScrollView>
+
+                        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+                          <Text style={styles.fieldLabel}>Rango de fechas</Text>
+                          <Pressable
+                            style={[styles.button, { paddingVertical: 8, paddingHorizontal: 12 }]}
+                            onPress={() => {
+                              const base =
+                                DateTime.fromISO(availabilityRangeStart || availabilityRangeEnd || isoToday()) || DateTime.now();
+                              setAvailabilityPickerMonth((base.isValid ? base : DateTime.now()).startOf("month"));
+                              setShowAvailabilityDatePicker(true);
+                            }}
+                          >
+                            <Text style={styles.buttonText}>Seleccionar rango</Text>
+                          </Pressable>
+                        </View>
+                        {!!availabilityRangeStart && (
+                          <View style={[styles.row, { marginTop: 4 }]}>
+                            <View style={[styles.chip, styles.chipActive]}>
+                              <Text style={[styles.chipText, styles.chipTextActive]}>
+                                {availabilityRangeEnd ? `${availabilityRangeStart} a ${availabilityRangeEnd}` : `Desde ${availabilityRangeStart}`}
+                              </Text>
+                            </View>
+                            <Pressable
+                              style={[styles.secondaryButtonFull, { paddingVertical: 8, paddingHorizontal: 12 }]}
+                              onPress={() => {
+                                setAvailabilityRangeStart(null);
+                                setAvailabilityRangeEnd(null);
+                              }}
+                            >
+                              <Text style={styles.buttonText}>Limpiar</Text>
+                            </Pressable>
+                          </View>
+                        )}
+
+                        <Text style={styles.fieldLabel}>Horario</Text>
                         <View style={styles.row}>
                           <TextInput
                             style={[styles.input, { flex: 1 }]}
                             value={availabilityStart}
                             onChangeText={setAvailabilityStart}
-                            placeholder="HH:MM inicio"
+                            placeholder="Horario inicio"
                           />
                           <TextInput
                             style={[styles.input, { flex: 1 }]}
                             value={availabilityEnd}
                             onChangeText={setAvailabilityEnd}
-                            placeholder="HH:MM fin"
+                            placeholder="Horario fin"
                           />
                         </View>
+                        {!!availabilitySummary && (
+                          <Text style={styles.hint} numberOfLines={2}>
+                            {availabilitySummary}
+                          </Text>
+                        )}
                         <Pressable
                           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
                           onPress={publishAvailability}
@@ -2717,59 +4079,78 @@ export default function App() {
                     )}
 
                     <Section title="Agenda">
-                      <View style={[styles.rowBetween, { gap: 8, flexWrap: "wrap" }]}>
-                        <Text style={styles.label}>Citas y eventos del dispositivo</Text>
-                        <View style={{ flexDirection: "row", gap: 8 }}>
-                          <Pressable
-                            style={[styles.button, { paddingVertical: 8, paddingHorizontal: 10 }]}
-                            onPress={() => syncDeviceCalendar(false)}
-                            disabled={isSyncingCalendar}
-                          >
-                            <Text style={styles.buttonText}>{isSyncingCalendar ? "Sincronizando..." : "Sincronizar"}</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[styles.button, { paddingVertical: 8, paddingHorizontal: 10 }]}
-                            onPress={() => fetchAppointments(activeBusinessId || undefined)}
-                          >
-                            <Text style={styles.buttonText}>Refrescar</Text>
-                          </Pressable>
-                        </View>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.label}>Citas del negocio</Text>
+                        <Pressable
+                          style={[styles.button, { paddingVertical: 8, paddingHorizontal: 10 }]}
+                          onPress={() => fetchAppointments(activeBusinessId || undefined)}
+                          disabled={isAppointmentsLoading}
+                        >
+                          <Text style={styles.buttonText}>{isAppointmentsLoading ? "Cargando..." : "Refrescar"}</Text>
+                        </Pressable>
                       </View>
-                      <Text style={styles.hint}>Pediremos permiso de calendario para leer eventos locales.</Text>
 
-                      {isAppointmentsLoading && <ActivityIndicator color={palette.accent} />}
-                      {appointments.map((a) => (
-                        <View key={a.id} style={styles.appointmentRow}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.slotText}>{formatDateTime(a.startAt, currentZone)}</Text>
-                            <Text style={styles.label}>{a.service?.name}</Text>
-                          </View>
-                          <View style={[styles.tag, { borderColor: statusColor(a.status) }]}>
-                            <Text style={[styles.tagText, { color: statusColor(a.status) }]}>{prettyStatus(a.status)}</Text>
-                          </View>
-                          <Pressable onPress={() => cancelAppointment(a.id)} style={{ marginLeft: 8 }}>
-                            <Text style={styles.linkText}>Cancelar</Text>
-                          </Pressable>
-                        </View>
-                      ))}
-                      {!appointments.length && !isAppointmentsLoading && <Text style={styles.label}>Sin citas cargadas.</Text>}
-
-                      {!!deviceEvents.length && (
-                        <View style={{ marginTop: 8, gap: 8 }}>
-                          <Text style={styles.label}>Eventos del calendario del dispositivo</Text>
-                          {deviceEvents.map((ev) => (
-                            <View key={ev.id} style={styles.appointmentRow}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.slotText}>{formatDateTime(ev.startAt, currentZone)}</Text>
-                                <Text style={styles.label}>{ev.title}</Text>
+                      <ScrollView
+                        style={styles.agendaListScroll}
+                        contentContainerStyle={{ gap: 10, paddingBottom: 6 }}
+                        nestedScrollEnabled
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator
+                      >
+                        {[...appointments]
+                          .sort((a, b) => DateTime.fromISO(a.startAt).toMillis() - DateTime.fromISO(b.startAt).toMillis())
+                          .slice(0, 30)
+                          .map((a) => {
+                            const tone = statusColor(a.status);
+                            const card = (
+                              <Pressable
+                                key={a.id}
+                                style={({ pressed }) => [
+                                  styles.sessionRow,
+                                  { borderLeftWidth: 6, borderLeftColor: tone },
+                                  pressed && styles.pressed,
+                                ]}
+                                onPress={() => openAgendaPreview("appointment", a.id)}
+                              >
+                                <View style={{ flex: 1, gap: 4 }}>
+                                  <View style={styles.rowBetween}>
+                                    <Text style={styles.highlightTitle}>{a.service?.name || "Servicio"}</Text>
+                                    <View style={[styles.importanceDot, { backgroundColor: tone }]} />
+                                  </View>
+                                  <Text style={styles.subtitle}>{a.business?.name || "Negocio"}</Text>
+                                  <Text style={styles.hint}>{formatDateTime(a.startAt, currentZone)}</Text>
+                                </View>
+                                <View style={{ alignItems: "flex-end", gap: 6 }}>
+                                  <View style={[styles.tag, { borderColor: tone }]}>
+                                    <Text style={[styles.tagText, { color: tone }]}>{prettyStatus(a.status)}</Text>
+                                  </View>
+                                </View>
+                              </Pressable>
+                            );
+                            return (
+                              <View key={a.id} style={styles.swipeRow}>
+                                <Swipeable
+                                  renderRightActions={() => (
+                                    <Pressable
+                                      style={({ pressed }) => [styles.swipeCancel, pressed && styles.pressed]}
+                                      onPress={() => confirmCancelAgendaAppointment(a.id)}
+                                    >
+                                      <Ionicons name="close-circle-outline" size={22} color="#fff" />
+                                      <Text style={styles.swipeDeleteText}>Cancelar</Text>
+                                    </Pressable>
+                                  )}
+                                  rightThreshold={12}
+                                  friction={2}
+                                  dragOffsetFromRightEdge={20}
+                                  overshootRight={false}
+                                >
+                                  {card}
+                                </Swipeable>
                               </View>
-                              <View style={[styles.tag, { borderColor: statusColor("CALENDARIO") }]}>
-                                <Text style={[styles.tagText, { color: statusColor("CALENDARIO") }]}>Calendario</Text>
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      )}
+                            );
+                          })}
+                        {!appointments.length && !isAppointmentsLoading && <Text style={styles.label}>Sin citas cargadas.</Text>}
+                      </ScrollView>
                     </Section>
                   </>
                 )}
@@ -2920,6 +4301,20 @@ export default function App() {
           selectedIso={selectedDate}
           disabledIso={(iso) => isDateSaturated(iso)}
         />
+        <DateRangePickerModal
+          visible={showAvailabilityDatePicker}
+          month={availabilityPickerMonth}
+          onClose={() => setShowAvailabilityDatePicker(false)}
+          onPrev={() => setAvailabilityPickerMonth((m) => m.minus({ months: 1 }))}
+          onNext={() => setAvailabilityPickerMonth((m) => m.plus({ months: 1 }))}
+          days={availabilityMonthDays}
+          startIso={availabilityRangeStart}
+          endIso={availabilityRangeEnd}
+          onChange={(startIso, endIso) => {
+            setAvailabilityRangeStart(startIso);
+            setAvailabilityRangeEnd(endIso);
+          }}
+        />
         {showNewActivityForm && (
           <View style={styles.sheetOverlay}>
             <Pressable style={styles.sheetBackdrop} onPress={handleCloseActivityForm} />
@@ -3014,90 +4409,7 @@ export default function App() {
             </KeyboardAvoidingView>
           </View>
         )}
-        {showRegisterSheet && (
-          <View style={styles.sheetOverlay}>
-            <Pressable style={styles.sheetBackdrop} onPress={() => setShowRegisterSheet(false)} />
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-              style={styles.sheetCard}
-            >
-              <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Crear cuenta</Text>
-                <Pressable onPress={() => setShowRegisterSheet(false)} hitSlop={10}>
-                  <Ionicons name="close" size={20} color={palette.muted} />
-                </Pressable>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 10, paddingBottom: 16 }}>
-                <Text style={styles.fieldLabel}>Usuario</Text>
-                <TextInput
-                  style={styles.input}
-                  value={regName}
-                  onChangeText={setRegName}
-                  placeholder="Tu nombre"
-                />
-
-                <Text style={styles.fieldLabel}>Correo</Text>
-                <TextInput
-                  style={styles.input}
-                  value={regEmail}
-                  onChangeText={setRegEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  placeholder="correo@ejemplo.com"
-                />
-
-                <Text style={styles.fieldLabel}>Contraseña</Text>
-                <TextInput
-                  style={styles.input}
-                  value={regPassword}
-                  onChangeText={setRegPassword}
-                  secureTextEntry
-                  placeholder="Crea una contraseña"
-                />
-
-                <Text style={styles.fieldLabel}>País</Text>
-                <TextInput
-                  style={styles.input}
-                  value={regCountry}
-                  onChangeText={setRegCountry}
-                  placeholder="Tu país"
-                />
-
-                <Text style={styles.fieldLabel}>Zona horaria</Text>
-                <View style={styles.rowBetween}>
-                  <Text style={styles.label}>{regTimezone || "UTC"}</Text>
-                  <Pressable
-                    style={[styles.button, { paddingVertical: 8, paddingHorizontal: 10 }]}
-                    onPress={detectRegionFromDevice}
-                    disabled={isRegDetecting}
-                  >
-                    <Text style={styles.buttonText}>{isRegDetecting ? "Detectando..." : "Usar dispositivo"}</Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.row}>
-                  <Pressable
-                    style={({ pressed }) => [styles.secondaryButtonFull, pressed && styles.pressed, { flex: 1 }]}
-                    onPress={() => setShowRegisterSheet(false)}
-                    disabled={isRegSubmitting}
-                  >
-                    <Text style={styles.buttonText}>Cancelar</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, { flex: 1 }]}
-                    onPress={() => handleRegisterFromForm(accessKind)}
-                    disabled={isRegSubmitting}
-                  >
-                    <Text style={styles.primaryButtonText}>{isRegSubmitting ? "Creando..." : "Crear"}</Text>
-                  </Pressable>
-                </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </View>
-        )}
+        {registerSheetNode}
         <Modal
           visible={showAvatarSheet}
           transparent
@@ -3115,101 +4427,13 @@ export default function App() {
               <View style={styles.row}>
                 <Pressable
                   style={[styles.actionButton, styles.sheetButton]}
-                  onPress={async () => {
-                    Keyboard.dismiss();
-                    const perm = await ImagePicker.requestCameraPermissionsAsync();
-                    if (!perm.granted) {
-                      Alert.alert("Permiso requerido", "Activa la cámara para tomar una foto.");
-                      return;
-                    }
-                    const res = await ImagePicker.launchCameraAsync({
-                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                      quality: 0.7,
-                      allowsEditing: true,
-                      aspect: [1, 1],
-                      base64: true,
-                    });
-                    if (!res.canceled) {
-                      const asset = res.assets?.[0];
-                      const base64 = asset?.base64;
-                      const uri = asset?.uri;
-                      const dataUri = base64 ? `data:image/jpeg;base64,${base64}` : uri;
-                      if (dataUri) {
-                        setAvatarUri(dataUri);
-                        AsyncStorage.setItem(
-                          STORAGE_PROFILE,
-                          JSON.stringify({
-                            name: profileName,
-                            status: profileStatus,
-                            avatarUri: dataUri,
-                            notifyApp,
-                            notifyEmail,
-                            visibility,
-                            email: newEmail,
-                            phone: profilePhone,
-                          }),
-                        ).catch(() => undefined);
-                        if (authHeaders) {
-                          fetch(`${API_BASE_URL}/users/me`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json", ...authHeaders },
-                            body: JSON.stringify({ avatarUrl: dataUri }),
-                          }).catch(() => undefined);
-                        }
-                      }
-                      setShowAvatarSheet(false);
-                    }
-                  }}
+                  onPress={() => openAvatarPicker("camera")}
                 >
                   <Text style={styles.actionText}>Cámara</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.actionButton, styles.sheetButton]}
-                  onPress={async () => {
-                    Keyboard.dismiss();
-                    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                    if (!perm.granted) {
-                      Alert.alert("Permiso requerido", "Activa el permiso de fotos para cambiar tu avatar.");
-                      return;
-                    }
-                    const res = await ImagePicker.launchImageLibraryAsync({
-                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                      quality: 0.7,
-                      allowsEditing: true,
-                      aspect: [1, 1],
-                      base64: true,
-                    });
-                    if (!res.canceled) {
-                      const asset = res.assets?.[0];
-                      const base64 = asset?.base64;
-                      const uri = asset?.uri;
-                      const dataUri = base64 ? `data:image/jpeg;base64,${base64}` : uri;
-                      if (dataUri) {
-                        setAvatarUri(dataUri);
-                        AsyncStorage.setItem(
-                          STORAGE_PROFILE,
-                          JSON.stringify({
-                            name: profileName,
-                            status: profileStatus,
-                            avatarUri: dataUri,
-                            notifyApp,
-                            notifyEmail,
-                            visibility,
-                            email: newEmail,
-                            phone: profilePhone,
-                          }),
-                        ).catch(() => undefined);
-                        if (authHeaders) {
-                          fetch(`${API_BASE_URL}/users/me`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json", ...authHeaders },
-                            body: JSON.stringify({ avatarUrl: dataUri }),
-                          }).catch(() => undefined);
-                        }
-                      }
-                      setShowAvatarSheet(false);
-                    }
-                  }}
+                  onPress={() => openAvatarPicker("library")}
                 >
                   <Text style={styles.actionText}>Galería</Text>
                 </Pressable>
@@ -3220,6 +4444,44 @@ export default function App() {
             </View>
           </View>
         </Modal>
+        {!!avatarPreviewUri && (
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { maxWidth: 360, alignItems: "center" }]}>
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalTitle}>Vista previa</Text>
+                <Pressable style={styles.modalClose} onPress={() => setAvatarPreviewUri(null)} hitSlop={10}>
+                  <Ionicons name="close" size={20} color={palette.muted} />
+                </Pressable>
+              </View>
+              <Text style={[styles.hint, { textAlign: "center", marginBottom: 8 }]}>
+                Así quedará tu foto de perfil después del recorte.
+              </Text>
+              <View style={styles.avatarPreviewFrame}>
+                <View style={styles.avatarPreviewCircle}>
+                  <Image source={{ uri: avatarPreviewUri }} style={styles.avatarPreviewImage} />
+                </View>
+              </View>
+              <View style={[styles.row, { marginTop: 14 }]}>
+                <Pressable
+                  style={({ pressed }) => [styles.secondaryButtonFull, pressed && styles.pressed, { flex: 1 }]}
+                  onPress={() => setAvatarPreviewUri(null)}
+                >
+                  <Text style={styles.buttonText}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, { flex: 1 }]}
+                  onPress={async () => {
+                    if (!avatarPreviewUri) return;
+                    await persistAvatar(avatarPreviewUri);
+                    setAvatarPreviewUri(null);
+                  }}
+                >
+                  <Text style={styles.primaryButtonText}>Usar foto</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
         {showProfileModal && (
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
@@ -3247,7 +4509,7 @@ export default function App() {
                     )}
                   </View>
                   <Pressable style={styles.avatarEdit} onPress={pickAvatar} disabled={!isProfileEditing}>
-                    <Text style={styles.avatarEditText}>?</Text>
+                    <Ionicons name="pencil" size={16} color="#fff" />
                   </Pressable>
                 </View>
                 <Text style={styles.subtitle}>{profileStatus}</Text>
@@ -3412,6 +4674,7 @@ export default function App() {
                             notifyApp,
                             notifyEmail,
                             visibility,
+                            deviceCalendarEnabled,
                           }),
                         ).catch(() => Alert.alert("Aviso", "No se pudo guardar el perfil en disco."));
                         try {
@@ -3491,6 +4754,23 @@ export default function App() {
                 </Pressable>
               </View>
 
+              <Text style={styles.fieldLabel}>Calendario del dispositivo</Text>
+              <View style={styles.rowBetween}>
+                <Text style={styles.label}>Conectar calendario</Text>
+                <Pressable
+                  style={[styles.toggle, deviceCalendarEnabled && styles.toggleOn]}
+                  onPress={() => {
+                    setDeviceCalendarEnabled((v) => {
+                      const next = !v;
+                      if (!next) setDeviceEvents([]);
+                      return next;
+                    });
+                  }}
+                >
+                  <View style={[styles.toggleDot, deviceCalendarEnabled && styles.toggleDotOn]} />
+                </Pressable>
+              </View>
+
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Pressable
                   style={[styles.secondaryButtonFull, { flex: 1 }]}
@@ -3509,7 +4789,9 @@ export default function App() {
                       notifyApp,
                       notifyEmail,
                       visibility,
+                      deviceCalendarEnabled,
                       email: newEmail,
+                      phone: profilePhone,
                     };
                     AsyncStorage.setItem(STORAGE_PROFILE, JSON.stringify(payload)).catch(() =>
                       Alert.alert("Aviso", "No se pudo guardar la configuración en disco."),
@@ -3545,7 +4827,7 @@ export default function App() {
                   {legalModal === "terms" ? "Términos y condiciones" : "Política de privacidad"}
                 </Text>
               </View>
-              <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ maxHeight: 360 }} nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 {legalModal === "terms" ? (
                   <View style={{ gap: 10, marginTop: 10 }}>
                     <Text style={styles.legalText}>
@@ -3593,7 +4875,7 @@ export default function App() {
                 </Pressable>
               </View>
 
-              <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator>
+              <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
                 <View style={{ gap: 10 }}>
                   {!notifications.length && <Text style={styles.label}>Sin notificaciones.</Text>}
                   {notifications.map((n) => {
@@ -3731,18 +5013,31 @@ export default function App() {
                   </Pressable>
                 )}
                 {agendaPreviewData.source === "device" && (
-                  <Pressable
-                    style={[styles.primaryButton, { flex: 1 }]}
-                    onPress={() => {
-                      setAgendaPreview(null);
-                      const rawId =
-                        ("calendarEventId" in agendaPreviewData && agendaPreviewData.calendarEventId) ||
-                        agendaPreviewData.id.replace(/^cal-/, "");
-                      openEditDeviceEvent(rawId);
-                    }}
-                  >
-                    <Text style={styles.primaryButtonText}>Editar</Text>
-                  </Pressable>
+                  <>
+                    <Pressable
+                      style={[styles.secondaryButtonFull, { flex: 1 }]}
+                      onPress={() => {
+                        const rawId =
+                          ("calendarEventId" in agendaPreviewData && agendaPreviewData.calendarEventId) ||
+                          agendaPreviewData.id.replace(/^cal-/, "");
+                        confirmDeleteDeviceEvent(rawId);
+                      }}
+                    >
+                      <Text style={styles.buttonText}>Eliminar</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.primaryButton, { flex: 1 }]}
+                      onPress={() => {
+                        setAgendaPreview(null);
+                        const rawId =
+                          ("calendarEventId" in agendaPreviewData && agendaPreviewData.calendarEventId) ||
+                          agendaPreviewData.id.replace(/^cal-/, "");
+                        openEditDeviceEvent(rawId);
+                      }}
+                    >
+                      <Text style={styles.primaryButtonText}>Editar</Text>
+                    </Pressable>
+                  </>
                 )}
               </View>
             </View>
@@ -3780,84 +5075,211 @@ function DatePickerModal({
   const monthLabelRaw = month.setLocale("es").toFormat("LLLL yyyy");
   const monthLabel = monthLabelRaw ? monthLabelRaw[0].toUpperCase() + monthLabelRaw.slice(1) : month.toFormat("LLLL yyyy");
   return (
-    <View style={styles.modalOverlay}>
-      <Pressable style={styles.calendarBackdrop} onPress={onClose} />
-      <View style={styles.calendarCard}>
-        <View style={styles.calendarHeader}>
-          <Pressable onPress={onPrev} style={styles.calendarNavBtn} hitSlop={10}>
-            <Ionicons name="chevron-back" size={20} color={palette.text} />
-          </Pressable>
-          <View style={{ alignItems: "center", gap: 2 }}>
-            <Text style={styles.calendarTitle}>{monthLabel}</Text>
-            <Text style={styles.calendarSubhead}>Selecciona una fecha</Text>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+      presentationStyle={Platform.OS === "ios" ? "overFullScreen" : undefined}
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.calendarBackdrop} onPress={onClose} />
+        <View style={styles.calendarCard}>
+          <View style={styles.calendarHeader}>
+            <Pressable onPress={onPrev} style={styles.calendarNavBtn} hitSlop={10}>
+              <Ionicons name="chevron-back" size={20} color={palette.text} />
+            </Pressable>
+            <View style={{ alignItems: "center", gap: 2 }}>
+              <Text style={styles.calendarTitle}>{monthLabel}</Text>
+              <Text style={styles.calendarSubhead}>Selecciona una fecha</Text>
+            </View>
+            <Pressable onPress={onNext} style={styles.calendarNavBtn} hitSlop={10}>
+              <Ionicons name="chevron-forward" size={20} color={palette.text} />
+            </Pressable>
           </View>
-          <Pressable onPress={onNext} style={styles.calendarNavBtn} hitSlop={10}>
-            <Ionicons name="chevron-forward" size={20} color={palette.text} />
-          </Pressable>
-        </View>
 
-        <View style={styles.calendarGrid}>
-          {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-            <Text key={d} style={styles.calendarDow}>
-              {d}
-            </Text>
-          ))}
-          {days.map((d) => {
-            const iso = d.toISODate() || "";
-            const isSelected = !!selectedIso && iso === selectedIso;
-            const isDisabled = !!disabledIso && !!iso && disabledIso(iso);
-            const isToday = !!iso && iso === todayIso;
-            const isOutside = d.month !== month.month || d.year !== month.year;
-            return (
-              <Pressable
-                key={iso}
-                style={({ pressed }) => [
-                  styles.calendarDay,
-                  isToday && !isSelected && !isDisabled && styles.calendarDayToday,
-                  isOutside && !isSelected && !isDisabled && styles.calendarDayOutside,
-                  isSelected && styles.calendarDaySelected,
-                  isDisabled && styles.calendarDayDisabled,
-                  pressed && !isDisabled && styles.pressed,
-                ]}
-                onPress={() => !isDisabled && onSelect(iso)}
-                disabled={isDisabled}
-              >
-                <Text
-                  style={[
-                    styles.calendarDayText,
-                    isOutside && !isSelected && !isDisabled && styles.calendarDayTextOutside,
-                    isSelected && styles.calendarDayTextSelected,
-                    isDisabled && styles.calendarDayTextDisabled,
+          <View style={styles.calendarGrid}>
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
+              <Text key={d} style={styles.calendarDow}>
+                {d}
+              </Text>
+            ))}
+            {days.map((d) => {
+              const iso = d.toISODate() || "";
+              const isSelected = !!selectedIso && iso === selectedIso;
+              const isDisabled = !!disabledIso && !!iso && disabledIso(iso);
+              const isToday = !!iso && iso === todayIso;
+              const isOutside = d.month !== month.month || d.year !== month.year;
+              return (
+                <Pressable
+                  key={iso}
+                  style={({ pressed }) => [
+                    styles.calendarDay,
+                    isToday && !isSelected && !isDisabled && styles.calendarDayToday,
+                    isOutside && !isSelected && !isDisabled && styles.calendarDayOutside,
+                    isSelected && styles.calendarDaySelected,
+                    isDisabled && styles.calendarDayDisabled,
+                    pressed && !isDisabled && styles.pressed,
                   ]}
+                  onPress={() => !isDisabled && onSelect(iso)}
+                  disabled={isDisabled}
                 >
-                  {String(d.day)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text
+                    style={[
+                      styles.calendarDayText,
+                      isOutside && !isSelected && !isDisabled && styles.calendarDayTextOutside,
+                      isSelected && styles.calendarDayTextSelected,
+                      isDisabled && styles.calendarDayTextDisabled,
+                    ]}
+                  >
+                    {String(d.day)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
-        <View style={{ alignItems: "center", marginTop: 12 }}>
-          <Pressable
-            style={({ pressed }) => [styles.calendarTodayBtn, pressed && styles.pressed]}
-            onPress={() => {
-              if (!todayIso) return;
-              if (disabledIso && disabledIso(todayIso)) return;
-              onSelect(todayIso);
-            }}
-          >
-            <Ionicons name="today-outline" size={18} color={palette.accent} />
-            <Text style={styles.calendarTodayText}>Hoy</Text>
-          </Pressable>
-        </View>
+          <View style={{ alignItems: "center", marginTop: 12 }}>
+            <Pressable
+              style={({ pressed }) => [styles.calendarTodayBtn, pressed && styles.pressed]}
+              onPress={() => {
+                if (!todayIso) return;
+                if (disabledIso && disabledIso(todayIso)) return;
+                onSelect(todayIso);
+              }}
+            >
+              <Ionicons name="today-outline" size={18} color={palette.accent} />
+              <Text style={styles.calendarTodayText}>Hoy</Text>
+            </Pressable>
+          </View>
 
-        <View style={styles.row}>
-          <Pressable onPress={onClose} style={[styles.secondaryButtonFull, { flex: 1 }]}>
-            <Text style={styles.buttonText}>Cerrar</Text>
-          </Pressable>
+          <View style={styles.row}>
+            <Pressable onPress={onClose} style={[styles.secondaryButtonFull, { flex: 1 }]}>
+              <Text style={styles.buttonText}>Cerrar</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
-    </View>
+    </Modal>
+  );
+}
+
+function DateRangePickerModal({
+  visible,
+  onClose,
+  month,
+  onPrev,
+  onNext,
+  days,
+  startIso,
+  endIso,
+  onChange,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  month: DateTime;
+  onPrev: () => void;
+  onNext: () => void;
+  days: DateTime[];
+  startIso: string | null;
+  endIso: string | null;
+  onChange: (startIso: string | null, endIso: string | null) => void;
+}) {
+  if (!visible) return null;
+  const todayIso = DateTime.now().toISODate() || "";
+  const rangeIsos = startIso && endIso ? new Set(expandDateRange(startIso, endIso)) : new Set(startIso ? [startIso] : []);
+  const monthLabelRaw = month.setLocale("es").toFormat("LLLL yyyy");
+  const monthLabel = monthLabelRaw ? monthLabelRaw[0].toUpperCase() + monthLabelRaw.slice(1) : month.toFormat("LLLL yyyy");
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+      presentationStyle={Platform.OS === "ios" ? "overFullScreen" : undefined}
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.calendarBackdrop} onPress={onClose} />
+        <View style={styles.calendarCard}>
+          <View style={styles.calendarHeader}>
+            <Pressable onPress={onPrev} style={styles.calendarNavBtn} hitSlop={10}>
+              <Ionicons name="chevron-back" size={20} color={palette.text} />
+            </Pressable>
+            <View style={{ alignItems: "center", gap: 2 }}>
+              <Text style={styles.calendarTitle}>{monthLabel}</Text>
+              <Text style={styles.calendarSubhead}>Selecciona desde y hasta</Text>
+            </View>
+            <Pressable onPress={onNext} style={styles.calendarNavBtn} hitSlop={10}>
+              <Ionicons name="chevron-forward" size={20} color={palette.text} />
+            </Pressable>
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
+              <Text key={d} style={styles.calendarDow}>
+                {d}
+              </Text>
+            ))}
+            {days.map((d) => {
+              const iso = d.toISODate() || "";
+              const isSelected = !!iso && rangeIsos.has(iso);
+              const isToday = !!iso && iso === todayIso;
+              const isOutside = d.month !== month.month || d.year !== month.year;
+              return (
+                <Pressable
+                  key={iso}
+                  style={({ pressed }) => [
+                    styles.calendarDay,
+                    isToday && !isSelected && styles.calendarDayToday,
+                    isOutside && !isSelected && styles.calendarDayOutside,
+                    isSelected && styles.calendarDaySelected,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => {
+                    if (!iso) return;
+                    if (!startIso || (startIso && endIso)) {
+                      onChange(iso, null);
+                    } else {
+                      const sorted = [startIso, iso].sort();
+                      onChange(sorted[0], sorted[1]);
+                    }
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.calendarDayText,
+                      isOutside && !isSelected && styles.calendarDayTextOutside,
+                      isSelected && styles.calendarDayTextSelected,
+                    ]}
+                  >
+                    {String(d.day)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={[styles.hint, { textAlign: "center", marginTop: 12 }]}>
+            {startIso && endIso
+              ? `${startIso} a ${endIso}`
+              : startIso
+                ? `Desde ${startIso}`
+                : "No hay rango seleccionado"}
+          </Text>
+
+          <View style={styles.row}>
+            <Pressable onPress={() => onChange(null, null)} style={[styles.secondaryButtonFull, { flex: 1 }]}>
+              <Text style={styles.buttonText}>Limpiar</Text>
+            </Pressable>
+            <Pressable onPress={onClose} style={[styles.primaryButton, { flex: 1 }]}>
+              <Text style={styles.primaryButtonText}>Listo</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -3898,7 +5320,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   circleIconText: { color: "#fff", fontSize: 24, fontWeight: "800" },
-  container: { padding: 20, gap: 16 },
+  container: {
+    width: "100%",
+    maxWidth: 820,
+    alignSelf: "center",
+    padding: 20,
+    gap: 16,
+  },
   hero: {
     backgroundColor: palette.accentSoft,
     borderRadius: 16,
@@ -3958,7 +5386,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  cardMenuOpen: { zIndex: 1000, elevation: 10, position: "relative", overflow: "visible" },
+  cardMenuOpen: { zIndex: 6000, elevation: 60, position: "relative", overflow: "visible" },
   row: { flexDirection: "row", gap: 8, alignItems: "center", flexWrap: "wrap" },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   rowScroll: { flexGrow: 0 },
@@ -4007,6 +5435,91 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   socialCircleText: { fontWeight: "800", fontSize: 16 },
+  registerIntroCard: {
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 10,
+    backgroundColor: "#dbe4f0",
+  },
+  registerBody: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    padding: 14,
+    marginBottom: 10,
+  },
+  registerIntroTop: {
+    backgroundColor: "#2f8f4e",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 18,
+    gap: 6,
+  },
+  registerIntroTitle: { color: "#ffffff" },
+  registerIntroCopy: { color: "rgba(255,255,255,0.92)", fontSize: 12, lineHeight: 18 },
+  registerSocialPanel: {
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 18,
+    backgroundColor: "#dde5ef",
+  },
+  registerSocialTitle: { fontSize: 13, color: "#2f8f4e", marginBottom: 4 },
+  registerSocialCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  registerScroll: { maxHeight: 420, paddingRight: 4 },
+  registerFormContent: { gap: 10, paddingBottom: 8, paddingRight: 6 },
+  registerInput: {
+    backgroundColor: "#ffffff",
+    borderColor: "#d7ddea",
+    minHeight: 44,
+  },
+  locationBar: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.border,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  locationBarTitle: { fontSize: 12, fontWeight: "700", color: palette.text },
+  locationBarText: { fontSize: 13, color: palette.muted, marginTop: 2 },
+  locationRefreshButton: {
+    minWidth: 106,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: palette.secondary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  locationRefreshText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  selectInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectInputText: { flex: 1, color: palette.text, fontSize: 16 },
+  selectInputPlaceholder: { color: palette.muted },
+  settingsFieldWrap: { width: "100%", maxWidth: 420, alignSelf: "flex-start" },
+  settingsInput: { width: "100%", maxWidth: 420, minHeight: 44 },
+  settingsTimeRow: { flexDirection: "row", gap: 10, flexWrap: "wrap", width: "100%", maxWidth: 420 },
+  settingsTimeInput: { flex: 1, minWidth: 160, maxWidth: 205 },
   socialButton: {
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -4057,10 +5570,10 @@ const styles = StyleSheet.create({
   nextTime: { fontSize: 20, fontWeight: "700", color: palette.text },
   nextDetail: { fontSize: 15, fontWeight: "700", color: palette.text },
   nextSubdetail: { fontSize: 12, color: palette.muted },
-  tabRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  tabRow: { flexDirection: "row", gap: 8, marginBottom: 10, position: "relative", zIndex: 1 },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.border,
@@ -4119,13 +5632,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 999,
     borderWidth: 2,
-    borderColor: "#0ea5e9",
+    borderColor: "#3f9f57",
     backgroundColor: "#fff",
     paddingHorizontal: 12,
     height: 54,
     gap: 10,
   },
-  inputPillIcon: { color: "#0ea5e9", fontSize: 18 },
+  inputPillIcon: { color: "#2f8f4e", fontSize: 18 },
   inputPillField: { flex: 1, color: palette.text, fontWeight: "600" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   slot: {
@@ -4145,7 +5658,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: palette.border,
   },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 12, position: "relative", zIndex: 6500 },
   avatar: {
     width: 56,
     height: 56,
@@ -4246,8 +5759,8 @@ const styles = StyleSheet.create({
     backgroundColor: palette.card,
   },
   menuButtonText: { fontSize: 14, fontWeight: "700", color: palette.accent },
-  menuAnchor: { position: "relative", zIndex: 1000 },
-  topRightButtons: { flexDirection: "row", alignItems: "center", gap: 8 },
+  menuAnchor: { position: "relative", zIndex: 6001 },
+  topRightButtons: { flexDirection: "row", alignItems: "center", gap: 8, zIndex: 6001 },
   menu: {
     position: "absolute",
     top: "100%",
@@ -4264,15 +5777,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     minWidth: 190,
-    zIndex: 1001,
-    elevation: 20,
+    zIndex: 7000,
+    elevation: 80,
   },
   menuItem: { paddingVertical: 6 },
   menuItemRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   menuText: { fontSize: 13, fontWeight: "600", color: palette.text },
   legalText: { fontSize: 13, lineHeight: 18, color: palette.text },
-  loginHelpers: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 4 },
-  rememberRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  loginHelpers: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginVertical: 4, gap: 14, flexWrap: "wrap" },
+  rememberRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   rememberBox: {
     width: 16,
     height: 17,
@@ -4280,16 +5793,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
     backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  rememberBoxOn: { backgroundColor: "#0f52ba", borderColor: "#0f52ba" },
+  rememberBoxOn: { backgroundColor: "#2f8f4e", borderColor: "#2f8f4e" },
   rememberCheck: { color: "#fff", fontSize: 12, fontWeight: "800" },
   loginHint: { color: "#e5e7eb", fontSize: 12 },
-  loginLink: { color: "#dbeafe", fontSize: 12, textDecorationLine: "underline" },
+  loginLink: { color: "#dff0e4", fontSize: 12, textDecorationLine: "underline" },
   loginButton: {
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
-    backgroundColor: "rgba(15,82,186,0.9)",
+    backgroundColor: "rgba(47,143,78,0.92)",
     alignItems: "center",
     marginTop: 4,
   },
@@ -4320,7 +5835,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     backgroundColor: "transparent",
   },
-  pillButtonText: { fontWeight: "800", color: "#1e3a8a" },
+  pillButtonText: { fontWeight: "800", color: "#2f8f4e" },
   pillButtonTextAlt: { fontWeight: "800", color: "#fff" },
   fingerprint: {
     width: 70,
@@ -4332,6 +5847,72 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fingerprintText: { fontSize: 26, color: "#fff" },
+  melonShell: {
+    backgroundColor: "#89d36a",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#f3fff0",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  melonFlesh: {
+    backgroundColor: "#d9f6c8",
+    borderWidth: 2,
+    borderColor: "#5ea84d",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  melonLeaf: {
+    position: "absolute",
+    top: "-4%",
+    right: "18%",
+    backgroundColor: "#2f8f4e",
+    transform: [{ rotate: "-28deg" }],
+    zIndex: 3,
+  },
+  melonStem: {
+    position: "absolute",
+    top: "4%",
+    backgroundColor: "#5a6d3d",
+    zIndex: 2,
+  },
+  melonStripeVertical: {
+    position: "absolute",
+    width: 2,
+    top: "8%",
+    bottom: "8%",
+    backgroundColor: "rgba(94,168,77,0.45)",
+  },
+  melonStripeHorizontal: {
+    position: "absolute",
+    height: 2,
+    left: "8%",
+    right: "8%",
+    backgroundColor: "rgba(94,168,77,0.45)",
+  },
+  melonStripeDiagonalA: {
+    position: "absolute",
+    width: "140%",
+    height: 2,
+    backgroundColor: "rgba(94,168,77,0.35)",
+    transform: [{ rotate: "45deg" }],
+  },
+  melonStripeDiagonalB: {
+    position: "absolute",
+    width: "140%",
+    height: 2,
+    backgroundColor: "rgba(94,168,77,0.35)",
+    transform: [{ rotate: "-45deg" }],
+  },
+  melonSeed: {
+    position: "absolute",
+    backgroundColor: "#5ea84d",
+    opacity: 0.9,
+  },
   waveTop: {
     position: "absolute",
     top: -40,
@@ -4364,23 +5945,95 @@ const styles = StyleSheet.create({
   },
   highlightCard: {
     width: 220,
-    padding: 14,
+    minHeight: 122,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: palette.accent,
     backgroundColor: palette.accentSoft,
+    overflow: "hidden",
   },
   highlightTitle: { fontSize: 16, fontWeight: "700", color: palette.text },
-  gridCards: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  squareCard: {
-    width: "47%",
-    minWidth: 150,
+  businessCardBackground: {
+    flex: 1,
+    minHeight: 120,
+    justifyContent: "flex-end",
+  },
+  squareCardBackground: {
+    minHeight: 128,
+    justifyContent: "flex-end",
+    margin: -14,
     padding: 14,
+  },
+  businessCardBackgroundImage: {
+    borderRadius: 14,
+  },
+  businessCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.28)",
+  },
+  businessCardContent: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    padding: 14,
+  },
+  squareCardContent: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+  },
+  businessCardTitle: { fontSize: 18, fontWeight: "800", color: "#fff" },
+  businessCardSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.92)", fontWeight: "600" },
+  businessLogo: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.card,
   },
+  businessLogoFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  businessLogoText: { color: palette.text, fontWeight: "900" },
+  gridCards: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  squareCard: {
+    width: "47%",
+    minWidth: 150,
+    padding: 14,
+    minHeight: 128,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    overflow: "hidden",
+  },
+  businessLogoSm: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+  },
+  businessLogoFallbackSm: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  businessLogoTextSm: { color: palette.text, fontWeight: "900", fontSize: 12 },
   fab: {
     position: "absolute",
     left: 20,
@@ -4418,7 +6071,6 @@ const styles = StyleSheet.create({
   brandTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
   brandSubtitle: { color: palette.muted, fontSize: 12 },
   brandTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  brandTitleLogo: { width: 50, height: 50, resizeMode: "contain" },
   modalOverlay: {
     position: "absolute",
     top: 0,
@@ -4487,11 +6139,17 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
     minHeight: 340,
     backgroundColor: palette.card,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.border,
     padding: 14,
+  },
+  registerSheetCard: {
+    width: "92%",
+    maxWidth: 460,
+    alignSelf: "center",
+    maxHeight: "82%",
+    padding: 12,
   },
   sheetHandle: {
     width: 44,
@@ -4503,6 +6161,11 @@ const styles = StyleSheet.create({
   },
   sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   sheetTitle: { fontSize: 16, fontWeight: "800", color: palette.text },
+  deviceAgendaCard: {
+    borderTopWidth: 2,
+    borderTopColor: palette.accent,
+    backgroundColor: "#f9fafb",
+  },
   calendarCard: {
     width: "94%",
     maxWidth: 520,
@@ -4597,6 +6260,26 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   avatarEditText: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  avatarPreviewFrame: {
+    width: 190,
+    height: 190,
+    borderRadius: 24,
+    backgroundColor: palette.accentSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  avatarPreviewCircle: {
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    overflow: "hidden",
+    borderWidth: 3,
+    borderColor: "#fff",
+    backgroundColor: palette.card,
+  },
+  avatarPreviewImage: { width: "100%", height: "100%" },
   toggle: {
     width: 48,
     height: 26,
@@ -4621,6 +6304,49 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: palette.border,
   },
+  inlinePickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    zIndex: 50,
+  },
+  inlinePickerCard: {
+    width: "100%",
+    maxWidth: 360,
+    maxHeight: 420,
+    backgroundColor: palette.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 16,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 20,
+  },
+  inlinePickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  inlinePickerScroll: { maxHeight: 320 },
+  inlinePickerItem: {
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  inlinePickerItemActive: { backgroundColor: palette.accentSoft },
+  inlinePickerItemText: { flex: 1, color: palette.text, fontSize: 14, fontWeight: "500" },
+  inlinePickerItemTextActive: { color: palette.accent, fontWeight: "700" },
   bottomSheetOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.25)",
@@ -4660,8 +6386,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     zIndex: -1,
   },
-  loginFull: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  loginCardMock: { width: 360, gap: 14, alignItems: "center", paddingVertical: 10 },
+  loginFull: { flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
+  loginCardMock: { width: 360, gap: 12, alignItems: "center", paddingVertical: 10 },
   loginLogo: {
     width: 86,
     height: 86,
@@ -4672,9 +6398,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
   },
-  // Legacy: was used when logo was stacked above the title.
-  MainLogocliente: { width: 100, height: 100, resizeMode: "contain" },
-  loginMainLogo: { width: 100, height: 100, resizeMode: "contain" },
   loginLogoText: { color: "#fff", fontSize: 32, fontWeight: "800" },
   loginTitleCenter: { color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
   loginSubtitleCenter: { color: "#e5e7eb", fontSize: 12, letterSpacing: 2 },
@@ -4691,22 +6414,23 @@ const styles = StyleSheet.create({
   },
   loginWaveBottom: {
     position: "absolute",
-    bottom: -160,
-    left: -140,
-    right: -140,
-    height: 320,
-    borderTopLeftRadius: 220,
-    borderTopRightRadius: 220,
+    bottom: -90,
+    left: -110,
+    right: -110,
+    height: 190,
+    borderTopLeftRadius: 160,
+    borderTopRightRadius: 160,
     backgroundColor: "#fff",
     opacity: 0.9,
   },
+  loginSocialBlock: { marginTop: 72, alignItems: "center", gap: 4 },
   formGap: { width: "100%", gap: 12, marginTop: 8 },
   inputPillWhite: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 999,
     borderWidth: 2,
-    borderColor: "#0d6efd",
+    borderColor: "#3f9f57",
     backgroundColor: "#fff",
     paddingHorizontal: 14,
     height: 56,
@@ -4714,11 +6438,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   inputPillFieldWhite: { flex: 1, color: "#0f172a", fontWeight: "600" },
-  inputPillIconBlue: { color: "#0d6efd", fontSize: 18 },
+  inputPillIconBlue: { color: "#2f8f4e", fontSize: 18 },
   passwordToggleButton: { padding: 8 },
-  passwordToggleIcon: { width: 50, height: 50, resizeMode: "contain", tintColor: "#0d6efd" },
+  passwordToggleIcon: { width: 50, height: 50, resizeMode: "contain", tintColor: "#2f8f4e" },
   loginCta: {
-    backgroundColor: "#1262fa",
+    backgroundColor: "#2f8f4e",
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 18,
@@ -4727,6 +6451,19 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   loginCtaText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  oauthButton: {
+    backgroundColor: "#0f172a",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 18,
+    alignItems: "center",
+    marginTop: 10,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  oauthButtonRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  oauthButtonText: { color: "#fff", fontWeight: "800", fontSize: 14, letterSpacing: 0.2 },
   loginCardClean: {
     width: 360,
     gap: 12,

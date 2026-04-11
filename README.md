@@ -1,6 +1,6 @@
-# Appointment (Schedly)
+# Appointment (Melon)
 
-Schedly es una aplicación moderna de gestión y reserva de citas diseñada para conectar negocios y clientes en un solo flujo simple e intuitivo.
+Melon es una aplicación moderna de gestión y reserva de citas diseñada para conectar negocios y clientes en un solo flujo simple e intuitivo.
 
 ## Monorepo
 - `apps/app`     – Expo React Native (TypeScript) una sola app: el usuario elige modo Cliente o Empresa.
@@ -25,6 +25,15 @@ docker compose up -d db
 3) Configurar variables:
 ```bash
 cp services/api/.env.example services/api/.env
+```
+
+Si usarás OAuth en la app móvil, agrega también estas variables en la raíz del repo en un archivo `.env` para Expo:
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
+EXPO_PUBLIC_OAUTH_ISSUER=https://oauth.kazehanacloud.com
+EXPO_PUBLIC_OAUTH_CLIENT_ID=melon-mobile
+EXPO_PUBLIC_OAUTH_AUDIENCE=melon-api
+EXPO_PUBLIC_OAUTH_EXCHANGE_URL=http://localhost:3000/auth/oauth/exchange
 ```
 
 4) Migrar Prisma y generar cliente:

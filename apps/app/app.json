@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Yoyakuo",
-    "slug": "yoyakuo",
-    "scheme": "yoyakuo",
+    "name": "Melon",
+    "slug": "melon",
+    "scheme": "melon",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,14 +17,23 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yoyakuo.app"
+      "bundleIdentifier": "com.melon.app"
     },
     "android": {
-      "package": "com.yoyakuo.app",
+      "package": "com.melon.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Melon usa tu ubicación para mostrar negocios cercanos y completar país y región."
+        }
+      ],
+      "expo-web-browser"
+    ]
   }
 }

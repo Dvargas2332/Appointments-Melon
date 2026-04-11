@@ -1,5 +1,5 @@
 {
-  "name": "yoyakuo-monorepo",
+  "name": "melon-monorepo",
   "private": true,
   "workspaces": [
     "apps/*",

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KazehanaCloud - OAuth + Tenant Workflow</title>
+<style>
+:root{
+  --bg:#0b1220;
+  --card:#0f1b33;
+  --text:#e7ecf7;
+  --muted:#b8c4e3;
+  --accent:#ffb020;
+  --line:rgba(231,236,247,.12);
+  --code:#0b0f1a;
+}
+html,body{margin:0;padding:0;background:radial-gradient(1000px 600px at 20% 0%, rgba(255,176,32,.18), transparent 55%), radial-gradient(900px 500px at 80% 10%, rgba(73,170,255,.18), transparent 50%), var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;}
+main{max-width:980px;margin:40px auto;padding:0 18px 60px;}
+.header{display:flex;align-items:baseline;gap:14px;margin:0 0 18px;}
+.badge{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);padding:6px 10px;border-radius:999px;background:rgba(15,27,51,.55);}
+article{background:rgba(15,27,51,.72); border:1px solid var(--line); border-radius:18px; padding:22px 22px 12px; box-shadow:0 24px 60px rgba(0,0,0,.32); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);}
+h1,h2,h3,h4{line-height:1.22;margin:18px 0 10px;}
+h1{margin-top:0;font-size:28px;}
+h2{font-size:20px;border-top:1px solid var(--line);padding-top:16px;}
+h3{font-size:16px;color:var(--muted);}
+li{margin:6px 0;}
+ul,ol{margin:8px 0 14px 22px;}
+pre{background:var(--code); border:1px solid var(--line); border-radius:12px; padding:14px; overflow:auto;}
+code{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; color: #f3f6ff;}
+a{color:var(--accent);}
+.small{color:var(--muted); font-size:12px; margin-top:14px;}
+</style>
+</head>
+<body>
+<main>
+  <div class="header"><div class="badge">Workflow / Dominios / OAuth / Tenant</div></div>
+  <article>
+    <h1>KazehanaCloud: Workflow OAuth + Multi‑Tenant (PMS Core + Apps Aisladas como Melon)</h1>
+<p>Este documento describe una estructura recomendada de dominios, autenticacion (OAuth/OIDC), emision/validacion de tokens, y flujo multi‑tenant para:</p>
+<ul>
+<li>**Core PMS** (el centro de todo, multi‑tenant, 1000+ hoteles).</li>
+<li>**Apps aisladas** (por ejemplo, **Melon**) que deben vivir bajo tu dominio, pero sin mezclar bases de datos ni permisos con el core.</li>
+</ul>
+<p>El objetivo es **SSO (Single Sign‑On)** centralizado con `oauth.kazehanacloud.com`, y APIs separadas por app con control de audiencia (`aud`) y tenant (`tenantId`).</p>
+<p>---</p>
+<h2>1) Estructura de Dominios (Recomendada)</h2>
+<h3>Dominio principal</h3>
+<ul>
+<li>`www.kazehanacloud.com`</li>
+<li>Landing/marketing, docs publicas, soporte.</li>
+<li>No se toca para auth ni APIs (evita riesgos).</li>
+</ul>
+<h3>Core PMS</h3>
+<ul>
+<li>`app.kazehanacloud.com`</li>
+<li>App web PMS (dashboard).</li>
+<li>`api.kazehanacloud.com`</li>
+<li>API PMS (multi‑tenant).</li>
+</ul>
+<h3>Auth central (SSO)</h3>
+<ul>
+<li>`oauth.kazehanacloud.com`</li>
+<li>Proveedor de identidad (IdP) OAuth2/OIDC.</li>
+<li>Unifica login/registro/recuperacion, emite tokens.</li>
+</ul>
+<h3>App aislada: Melon</h3>
+<ul>
+<li>`melon.kazehanacloud.com`</li>
+<li>Frontend web (si aplica) o landing de Melon.</li>
+<li>`api-melon.kazehanacloud.com`</li>
+<li>API propia de Melon (su BD, su modelo, su ritmo de despliegue).</li>
+</ul>
+<p>&gt; Variantes:</p>
+<p>&gt; - Si Melon es solo movil, aun conviene `api-melon.kazehanacloud.com`.</p>
+<p>&gt; - Si hay mas apps: `foo.kazehanacloud.com` + `api-foo.kazehanacloud.com`.</p>
+<p>---</p>
+<h2>2) DNS + TLS (Certificados)</h2>
+<ol>
+<li>En DNS, crear registros:</li>
+</ol>
+<ul>
+<li>`A/AAAA` o `CNAME` para:</li>
+<li>`app`, `api`, `oauth`, `melon`, `api-melon` (y los que uses).</li>
+</ul>
+<ol>
+<li>TLS:</li>
+</ol>
+<ul>
+<li>Usar certificados por subdominio o wildcard `*.kazehanacloud.com`.</li>
+<li>Mantener **HTTPS obligatorio** para OAuth/OIDC en produccion.</li>
+</ul>
+<p>---</p>
+<h2>3) Enrutamiento (Reverse Proxy / Gateway)</h2>
+<p>Una forma comun es usar un proxy/gateway (Cloudflare, Nginx, Traefik, etc.):</p>
+<ul>
+<li>`www.kazehanacloud.com` -&gt; servidor marketing</li>
+<li>`app.kazehanacloud.com` -&gt; frontend PMS</li>
+<li>`api.kazehanacloud.com` -&gt; backend PMS</li>
+<li>`oauth.kazehanacloud.com` -&gt; IdP/servicio auth</li>
+<li>`melon.kazehanacloud.com` -&gt; frontend Melon</li>
+<li>`api-melon.kazehanacloud.com` -&gt; backend Melon</li>
+</ul>
+<p>Beneficios:</p>
+<ul>
+<li>Separacion total (apps aisladas).</li>
+<li>Rate limit / WAF por subdominio.</li>
+<li>Deploys independientes.</li>
+<li>CORS por origen controlado.</li>
+</ul>
+<p>---</p>
+<h2>4) OAuth/OIDC: Flujos por Plataforma</h2>
+<h3>4.1 App web (PMS o Melon web)</h3>
+<p>Flujo recomendado: **Authorization Code + PKCE** (OIDC).</p>
+<ol>
+<li>`app.*` redirige a:</li>
+</ol>
+<ul>
+<li>`oauth.kazehanacloud.com/authorize?...`</li>
+</ul>
+<ol>
+<li>Login/consent en `oauth.*`</li>
+<li>Redireccion a:</li>
+</ol>
+<ul>
+<li>`https://app.kazehanacloud.com/callback`</li>
+<li>o `https://melon.kazehanacloud.com/callback`</li>
+</ul>
+<ol>
+<li>La app intercambia `code` por tokens en:</li>
+</ol>
+<ul>
+<li>`oauth.kazehanacloud.com/token`</li>
+</ul>
+<ol>
+<li>La app llama API con `Authorization: Bearer &lt;access_token&gt;`.</li>
+</ol>
+<h3>4.2 Movil (Expo / iOS / Android)</h3>
+<p>Dos patrones validos:</p>
+<p>**A) Universal Links (recomendado en produccion)**</p>
+<ul>
+<li>Callback HTTPS tipo:</li>
+<li>`https://melon.kazehanacloud.com/oauth/callback`</li>
+</ul>
+<p>**B) Custom Scheme**</p>
+<ul>
+<li>Callback tipo:</li>
+<li>`melon://oauth/callback`</li>
+</ul>
+<p>Igual: Code + PKCE.</p>
+<p>---</p>
+<h2>5) Multi‑Tenant: Como resolver el Tenant</h2>
+<p>Para 1000+ hoteles, evita depender de "un subdominio por hotel" como mecanismo principal.</p>
+<h3>Recomendacion</h3>
+<p>El **tenant viaja en el token** (claim `tenantId`) y el backend aplica filtros obligatorios.</p>
+<h4>Casos:</h4>
+<ol>
+<li>Usuario pertenece a 1 solo hotel</li>
+</ol>
+<ul>
+<li>`tenantId` fijo en token.</li>
+</ul>
+<ol>
+<li>Usuario pertenece a varios hoteles</li>
+</ol>
+<ul>
+<li>login emite token "sin tenant" y la app hace "seleccion de hotel".</li>
+<li>luego se emite un token "con tenant" o se usa un `X-Tenant` firmado.</li>
+</ul>
+<p>En ambos casos, el backend debe asegurar:</p>
+<ul>
+<li>Ninguna query se ejecute sin `tenantId`.</li>
+<li>Validacion de pertenencia (usuario -&gt; tenant).</li>
+</ul>
+<p>---</p>
+<h2>6) Tokens: Claims recomendados (Access Token)</h2>
+<p>Para que PMS y Melon compartan SSO sin mezclar permisos:</p>
+<ul>
+<li>`iss`: `https://oauth.kazehanacloud.com`</li>
+<li>`sub`: `userId`</li>
+<li>`aud`: audiencia del backend destino</li>
+<li>PMS API: `pms-api`</li>
+<li>Melon API: `melon-api`</li>
+<li>`tenantId`: ID del hotel/empresa (cuando aplique)</li>
+<li>`role`: rol (owner/staff/admin, etc.)</li>
+<li>`scp` / `permissions`: permisos</li>
+<li>`exp`, `iat`</li>
+</ul>
+<p>Regla:</p>
+<ul>
+<li>`api.kazehanacloud.com` solo acepta tokens con `aud=pms-api`.</li>
+<li>`api-melon.kazehanacloud.com` solo acepta tokens con `aud=melon-api`.</li>
+</ul>
+<p>Esto evita que un token del PMS sirva automaticamente para Melon si no debe.</p>
+<p>---</p>
+<h2>7) Melon aislada (App) pero con SSO</h2>
+<h3>7.1 Aislamiento recomendado</h3>
+<ul>
+<li>BD propia (por ejemplo `melon_db`) o esquema separado.</li>
+<li>API propia `api-melon.kazehanacloud.com`.</li>
+<li>Tokens con `aud=melon-api`.</li>
+</ul>
+<h3>7.2 Vinculo con PMS (opcional)</h3>
+<p>Si Melon necesita leer "hoteles/usuarios" del PMS:</p>
+<ul>
+<li>No compartir BD.</li>
+<li>Usar integracion via API del PMS o eventos (cola).</li>
+<li>Mantener boundaries: permisos y auditoria.</li>
+</ul>
+<p>---</p>
+<h2>8) Redirect URIs (Checklist)</h2>
+<p>Configurar en `oauth.kazehanacloud.com` (por app/client):</p>
+<h3>PMS Web</h3>
+<ul>
+<li>Allowed callback:</li>
+<li>`https://app.kazehanacloud.com/callback`</li>
+<li>Allowed logout:</li>
+<li>`https://app.kazehanacloud.com/`</li>
+</ul>
+<h3>Melon Web</h3>
+<ul>
+<li>Allowed callback:</li>
+<li>`https://melon.kazehanacloud.com/callback`</li>
+<li>Allowed logout:</li>
+<li>`https://melon.kazehanacloud.com/`</li>
+</ul>
+<h3>Melon Movil (si aplica)</h3>
+<ul>
+<li>Allowed callback:</li>
+<li>`melon://oauth/callback` (si custom scheme)</li>
+<li>o `https://melon.kazehanacloud.com/oauth/callback` (si universal links)</li>
+</ul>
+<p>---</p>
+<h2>9) CORS (Reglas simples)</h2>
+<ul>
+<li>`api.kazehanacloud.com`</li>
+<li>permitir origen `https://app.kazehanacloud.com` (y solo los necesarios).</li>
+<li>`api-melon.kazehanacloud.com`</li>
+<li>permitir origen `https://melon.kazehanacloud.com` (si hay web).</li>
+</ul>
+<p>Movil: CORS no aplica igual, pero mantenerlo cerrado igual ayuda.</p>
+<p>---</p>
+<h2>10) Seguridad y Operacion (Checklist)</h2>
+<ul>
+<li>HTTPS obligatorio en `oauth` y `api`.</li>
+<li>Rotacion de llaves (JWKS si usas OIDC).</li>
+<li>Rate limiting:</li>
+<li>fuerte en `/token`, `/authorize`, `/login`.</li>
+<li>Logs y auditoria:</li>
+<li>por `tenantId`, `userId`, `aud`.</li>
+<li>Separar ambientes:</li>
+<li>`dev-oauth.*`, `stg-oauth.*`, `oauth.*` (prod).</li>
+<li>Evitar tokens demasiado largos (claims minimos).</li>
+<li>Revocacion/refresh tokens segun plataforma:</li>
+<li>web: cookies seguras o storage + rotacion.</li>
+<li>movil: refresh con proteccion.</li>
+</ul>
+<p>---</p>
+<h2>11) Plan de Implementacion (Fases)</h2>
+<h3>Fase 1: Dominios + despliegue</h3>
+<ol>
+<li>Crear DNS subdominios.</li>
+<li>Levantar `api-melon` y `melon` con HTTPS.</li>
+</ol>
+<h3>Fase 2: OAuth central</h3>
+<ol>
+<li>Instalar/configurar IdP (Auth0/Keycloak/Cognito/etc).</li>
+<li>Registrar clients:</li>
+</ol>
+<ul>
+<li>`pms-web`</li>
+<li>`melon-web` (si aplica)</li>
+<li>`melon-mobile` (si aplica)</li>
+</ul>
+<h3>Fase 3: Token + tenant</h3>
+<ol>
+<li>Definir claims y audiencias.</li>
+<li>Implementar validacion en cada API.</li>
+<li>Implementar enforcement de `tenantId` en DB.</li>
+</ol>
+<h3>Fase 4: Migracion de login legacy</h3>
+<ol>
+<li>Mantener login viejo temporalmente.</li>
+<li>Migrar usuarios/flujo.</li>
+<li>Remover login directo cuando OAuth este estable.</li>
+</ol>
+<p>---</p>
+<h2>12) Notas sobre tu backend actual (NestJS + Prisma)</h2>
+<p>Tu backend actual tiene 2 tipos de usuario (client/business) y maneja tokens propios.</p>
+<p>Para integrarlo a OAuth central hay dos rutas:</p>
+<ol>
+<li>**OAuth real con IdP** (recomendado): tu API valida JWT del IdP (JWKS) y deja de emitir tokens propios.</li>
+<li>**Puente temporal**: `oauth.*` autentica y tu API intercambia por token interno (solo para transicion).</li>
+</ol>
+<p>---</p>
+<h2>13) Glosario rapido</h2>
+<ul>
+<li>**IdP**: Identity Provider (Auth0, Keycloak, Cognito, etc.)</li>
+<li>**OIDC**: OpenID Connect (OAuth2 + identidad)</li>
+<li>**PKCE**: mecanismo para evitar robo de `code` en apps publicas</li>
+<li>**aud**: audience, "para que backend sirve este token"</li>
+<li>**tenantId**: hotel/empresa/espacio aislado</li>
+</ul>
+    <p class="small">Generado desde docs/kazehanacloud-oauth-tenant-workflow.md</p>
+  </article>
+</main>
+</body>
+</html>

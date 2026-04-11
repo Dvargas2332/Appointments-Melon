@@ -10,6 +10,18 @@ type CreateBusinessInput = {
   category: string;
   phone?: string;
   address?: string;
+  country?: string;
+  region?: string;
+  timezone?: string;
+};
+
+type UpdateBusinessInput = {
+  name?: string;
+  category?: string;
+  phone?: string | null;
+  address?: string | null;
+  country?: string | null;
+  region?: string | null;
   timezone?: string;
 };
 
@@ -250,7 +262,25 @@ export class BookingService {
         category: input.category,
         phone: input.phone,
         address: input.address,
+        country: input.country,
+        region: input.region,
         timezone: input.timezone || "Asia/Tokyo",
+      },
+    });
+  }
+
+  async updateBusiness(businessId: string, input: UpdateBusinessInput, actorId?: string) {
+    await this.assertBusinessAccess(businessId, actorId);
+    return this.prisma.business.update({
+      where: { id: businessId },
+      data: {
+        name: input.name,
+        category: input.category,
+        phone: input.phone,
+        address: input.address,
+        country: input.country,
+        region: input.region,
+        timezone: input.timezone,
       },
     });
   }
@@ -259,6 +289,13 @@ export class BookingService {
     return this.prisma.business.findMany({
       where: ownerId ? { ownerId } : undefined,
       include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
         services: {
           where: { isActive: true },
           orderBy: { createdAt: "asc" },

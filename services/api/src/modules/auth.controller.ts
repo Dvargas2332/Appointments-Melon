@@ -5,7 +5,21 @@ import { AuthService } from "../services/auth.service";
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(4),
-  kind: z.enum(["client", "business"]),
+  // Optional to support "auto-detect kind" on login.
+  kind: z.enum(["client", "business"]).optional(),
+});
+
+const oauthExchangeSchema = z.object({
+  accessToken: z.string().min(1).optional(),
+  idToken: z.string().min(1).optional(),
+  provider: z.enum(["kazehana", "google", "apple", "line", "x"]).optional(),
+  kind: z.enum(["client", "business"]).optional(),
+  email: z.string().email().optional(),
+  name: z.string().min(1).optional(),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
 });
 
 @Controller("auth")
@@ -17,6 +31,32 @@ export class AuthController {
     try {
       const input = loginSchema.parse(body);
       return this.auth.login(input);
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new BadRequestException(err.issues);
+      }
+      throw err;
+    }
+  }
+
+  @Post("oauth/exchange")
+  exchange(@Body() body: unknown) {
+    try {
+      const input = oauthExchangeSchema.parse(body);
+      return this.auth.exchangeOAuth(input);
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new BadRequestException(err.issues);
+      }
+      throw err;
+    }
+  }
+
+  @Post("forgot-password")
+  forgotPassword(@Body() body: unknown) {
+    try {
+      const input = forgotPasswordSchema.parse(body);
+      return this.auth.forgotPassword(input.email);
     } catch (err) {
       if (err instanceof ZodError) {
         throw new BadRequestException(err.issues);

@@ -1,10 +1,13 @@
 {
-  "name": "yoyakuo-api",
+  "name": "melon-api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "prisma generate && node --watch -r ts-node/register src/main.ts",
+    "predev": "node scripts/stop-port.js 3000",
+    "dev": "node -r ts-node/register src/main.ts",
+    "predev:watch": "node scripts/stop-port.js 3000",
+    "dev:watch": "node --watch-path=src -r ts-node/register src/main.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start:prod": "node dist/main.js",
     "lint": "eslint .",
@@ -20,6 +23,7 @@
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
+    "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.5.0",
     "reflect-metadata": "^0.2.2",

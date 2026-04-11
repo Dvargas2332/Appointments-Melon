@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 async function upsertBusinessUser() {
   const passwordHash = await hash("1234", 10);
   return prisma.userBusiness.upsert({
-    where: { email: "admin@yoyakuo.test" },
+    where: { email: "admin@melon.test" },
     update: {
       name: "admin",
       password: passwordHash,
@@ -17,7 +17,7 @@ async function upsertBusinessUser() {
     },
     create: {
       name: "admin",
-      email: "admin@yoyakuo.test",
+      email: "admin@melon.test",
       password: passwordHash,
       role: "BUSINESS_OWNER",
     },
@@ -27,14 +27,14 @@ async function upsertBusinessUser() {
 async function upsertClientUser() {
   const passwordHash = await hash("1234", 10);
   return prisma.userClient.upsert({
-    where: { email: "cliente@yoyakuo.test" },
+    where: { email: "cliente@melon.test" },
     update: {
       name: "cliente",
       password: passwordHash,
     },
     create: {
       name: "cliente",
-      email: "cliente@yoyakuo.test",
+      email: "cliente@melon.test",
       password: passwordHash,
     },
   });

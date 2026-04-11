@@ -2,11 +2,11 @@ version: "3.9"
 services:
   db:
     image: postgres:16
-    container_name: yoyakuo_db
+    container_name: melon_db
     environment:
-      POSTGRES_USER: yoyakuo
-      POSTGRES_PASSWORD: yoyakuo
-      POSTGRES_DB: yoyakuo
+      POSTGRES_USER: melon
+      POSTGRES_PASSWORD: melon
+      POSTGRES_DB: melon
     ports:
       - "5432:5432"
     volumes:

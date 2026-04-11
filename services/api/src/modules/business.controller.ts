@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards, Req } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards, Req } from "@nestjs/common";
 import { z } from "zod";
 import { BookingService } from "../services/booking.service";
 import { AuthGuard, RequestWithUser } from "./auth.guard";
@@ -8,8 +8,22 @@ const createBusinessSchema = z.object({
   category: z.string().min(1),
   phone: z.string().optional(),
   address: z.string().optional(),
+  country: z.string().optional(),
+  region: z.string().optional(),
   timezone: z.string().optional(),
 });
+
+const updateBusinessSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    category: z.string().min(1).optional(),
+    phone: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+    country: z.string().nullable().optional(),
+    region: z.string().nullable().optional(),
+    timezone: z.string().optional(),
+  })
+  .refine((input) => Object.keys(input).length > 0, "Debe enviar al menos un campo");
 
 const createServiceSchema = z.object({
   name: z.string().min(1),
@@ -64,6 +78,16 @@ export class BusinessController {
     }
     const input = createBusinessSchema.parse(body);
     return this.booking.createBusiness({ ...input, ownerId: req.user.id });
+  }
+
+  @Patch(":businessId")
+  @UseGuards(AuthGuard)
+  update(@Param("businessId") businessId: string, @Req() req: RequestWithUser, @Body() body: unknown) {
+    if (req.user.kind !== "business") {
+      throw new ForbiddenException("Solo usuarios de negocio pueden actualizar negocios");
+    }
+    const input = updateBusinessSchema.parse(body);
+    return this.booking.updateBusiness(businessId, input, req.user.id);
   }
 
   @Post(":businessId/services")

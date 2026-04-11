@@ -20,12 +20,22 @@ const businessUserSchema = z.object({
 
 const emptyToNull = (value: unknown) => (value === "" ? null : value);
 const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);
+const avatarValueSchema = z
+  .string()
+  .refine(
+    (value) => {
+      if (value.startsWith("data:image/")) return true;
+      if (value.startsWith("file://")) return true;
+      return z.string().url().safeParse(value).success;
+    },
+    { message: "avatarUrl debe ser una URL valida o una imagen data URI" },
+  );
 
 const profileSchema = z.object({
   name: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
   phone: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
   status: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
-  avatarUrl: z.preprocess(emptyToNull, z.string().url().nullable().optional()),
+  avatarUrl: z.preprocess(emptyToNull, avatarValueSchema.nullable().optional()),
   visibility: z.boolean().optional(),
   notifyApp: z.boolean().optional(),
   notifyEmail: z.boolean().optional(),
@@ -39,8 +49,8 @@ const profileSchema = z.object({
   nombre: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
   telefono: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
   estado: z.preprocess(emptyToNull, z.string().min(1).nullable().optional()),
-  avatar: z.preprocess(emptyToNull, z.string().url().nullable().optional()),
-  avatar_url: z.preprocess(emptyToNull, z.string().url().nullable().optional()),
+  avatar: z.preprocess(emptyToNull, avatarValueSchema.nullable().optional()),
+  avatar_url: z.preprocess(emptyToNull, avatarValueSchema.nullable().optional()),
   correo: z.preprocess(emptyToUndefined, z.string().email().optional()),
   passwordActual: z.preprocess(emptyToUndefined, z.string().optional()),
   contrasenaActual: z.preprocess(emptyToUndefined, z.string().optional()),

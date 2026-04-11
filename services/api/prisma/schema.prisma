@@ -68,6 +68,8 @@ model Business {
   category  String
   phone     String?
   address   String?
+  country   String?
+  region    String?
   timezone  String   @default("Asia/Tokyo")
   status    String   @default("ACTIVE")
   createdAt DateTime @default(now())
