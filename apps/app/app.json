@@ -17,7 +17,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.melon.app"
+      "bundleIdentifier": "com.melon.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.melon.app",
@@ -37,7 +40,8 @@
           "locationWhenInUsePermission": "Melon usa tu ubicación para mostrar negocios cercanos y completar país y región."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "extra": {
       "eas": {

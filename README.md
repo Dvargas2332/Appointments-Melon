@@ -130,3 +130,4 @@ npm run app:dev
 El código de este repositorio es propietario. No se concede licencia para usar, copiar, modificar ni distribuir sin consentimiento escrito del titular. Para usos comerciales o cualquier redistribución se requiere un acuerdo previo y por escrito.
  
 Ver archivo [LICENSE](./LICENSE) para los términos completos.
+Ver archivo [LICENSE](./LICENSE) para los términos completos.
