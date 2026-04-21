@@ -1,15 +1,47 @@
 version: "3.9"
+
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: melon_db
+    restart: always
     environment:
-      POSTGRES_USER: melon
-      POSTGRES_PASSWORD: melon
-      POSTGRES_DB: melon
+      POSTGRES_USER: ${DATABASE_USER:-melon}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-melon_pass_123}
+      POSTGRES_DB: ${DATABASE_NAME:-melon_db}
     ports:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-melon} -d $${POSTGRES_DB:-melon_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: melon_api
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${DATABASE_USER:-melon}:${DATABASE_PASSWORD:-melon_pass_123}@db:5432/${DATABASE_NAME:-melon_db}?schema=public
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 400M
+
 volumes:
   db_data:

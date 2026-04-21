@@ -22,6 +22,10 @@ const forgotPasswordSchema = z.object({
   email: z.string().email(),
 });
 
+const refreshSchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
 @Controller("auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -48,6 +52,17 @@ export class AuthController {
       if (err instanceof ZodError) {
         throw new BadRequestException(err.issues);
       }
+      throw err;
+    }
+  }
+
+  @Post("refresh")
+  refresh(@Body() body: unknown) {
+    try {
+      const input = refreshSchema.parse(body);
+      return this.auth.refreshAccessToken(input.refreshToken);
+    } catch (err) {
+      if (err instanceof ZodError) throw new BadRequestException(err.issues);
       throw err;
     }
   }

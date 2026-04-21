@@ -17,8 +17,12 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
+# Copy the prisma CLI so migrate deploy works at runtime
+COPY --from=build /app/node_modules/prisma ./node_modules/prisma
+COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+# Run migrations then start the server
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]

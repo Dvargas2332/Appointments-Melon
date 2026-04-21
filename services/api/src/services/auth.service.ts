@@ -7,6 +7,9 @@ import { UserBusiness, UserClient, UserRole } from "@prisma/client";
 import { AuthPayload } from "../types/auth-user";
 import { PrismaService } from "./prisma.service";
 
+const REFRESH_TOKEN_EXPIRY = "30d";
+const ACCESS_TOKEN_EXPIRY_DEFAULT = "7d";
+
 type LoginInput = { email: string; password: string; kind?: "client" | "business" };
 
 type OAuthExchangeInput = {
@@ -37,35 +40,20 @@ export class AuthService {
 
   async login(input: LoginInput) {
     try {
-      const secret = this.getSecret();
-      const signOptions: SignOptions = { expiresIn: this.getJwtExpiresIn() as SignOptions["expiresIn"] };
-
       if (input.kind) {
         if (input.kind === "client") {
           const user = await this.prisma.userClient.findUnique({ where: { email: input.email } });
           if (!user) throw new UnauthorizedException("Credenciales invalidas");
           const ok = await compare(input.password, user.password);
           if (!ok) throw new UnauthorizedException("Credenciales invalidas");
-
-          const payload: AuthPayload = {
-            id: user.id,
-            email: user.email,
-            kind: "client",
-          };
-          return { token: jwt.sign(payload, secret, signOptions), user: payload };
+          return this.issueSession({ id: user.id, email: user.email, kind: "client" });
         }
 
         const user = await this.prisma.userBusiness.findUnique({ where: { email: input.email } });
         if (!user) throw new UnauthorizedException("Credenciales invalidas");
         const ok = await compare(input.password, user.password);
         if (!ok) throw new UnauthorizedException("Credenciales invalidas");
-        const payload: AuthPayload = {
-          id: user.id,
-          email: user.email,
-          kind: "business",
-          role: user.role,
-        };
-        return { token: jwt.sign(payload, secret, signOptions), user: payload };
+        return this.issueSession({ id: user.id, email: user.email, kind: "business", role: user.role });
       }
 
       const [clientUser, businessUser] = await Promise.all([
@@ -237,11 +225,27 @@ export class AuthService {
     };
   }
 
+  async refreshAccessToken(refreshToken: string) {
+    const secret = this.getSecret();
+    let payload: AuthPayload;
+    try {
+      const decoded = jwt.verify(refreshToken, secret) as AuthPayload & { type?: string };
+      if (decoded.type !== "refresh") throw new Error("Not a refresh token");
+      payload = { id: decoded.id, email: decoded.email, kind: decoded.kind, role: decoded.role };
+    } catch {
+      throw new UnauthorizedException("Refresh token inválido o expirado");
+    }
+    return this.issueSession(payload);
+  }
+
   private issueSession(payload: AuthPayload) {
     const secret = this.getSecret();
-    const signOptions: SignOptions = { expiresIn: this.getJwtExpiresIn() as SignOptions["expiresIn"] };
+    const accessOptions: SignOptions = { expiresIn: this.getJwtExpiresIn() as SignOptions["expiresIn"] };
+    const refreshOptions: SignOptions = { expiresIn: REFRESH_TOKEN_EXPIRY as SignOptions["expiresIn"] };
+    const refreshPayload = { ...payload, type: "refresh" };
     return {
-      token: jwt.sign(payload, secret, signOptions),
+      token: jwt.sign(payload, secret, accessOptions),
+      refreshToken: jwt.sign(refreshPayload, secret, refreshOptions),
       user: payload,
     };
   }
@@ -259,7 +263,7 @@ export class AuthService {
   }
 
   private getJwtExpiresIn() {
-    return process.env.JWT_EXPIRES_IN || "7d";
+    return process.env.JWT_EXPIRES_IN || ACCESS_TOKEN_EXPIRY_DEFAULT;
   }
 
   private getRequiredEnv(key: string) {

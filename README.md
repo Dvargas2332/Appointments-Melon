@@ -8,7 +8,9 @@
  
 **Melon** es una aplicación móvil moderna para la gestión y reserva de citas, diseñada para conectar negocios y clientes en un solo flujo simple e intuitivo.
  
-> 📱 **[Ver demo en Expo →](https://expo.dev/@dvargas2332/melon)**
+> 📱 **[Ver demo en Expo →](https://expo.dev/preview/update?message=demo+melon&updateRuntimeVersion=0.1.0&createdAt=2026-04-11T20%3A12%3A19.807Z&slug=melon&projectId=7b2a1627-3bee-4a94-af6d-6fc5dcbd58a9&group=152d35c7-ae9e-4d64-9e48-946176f7dbf6)**
+ 
+> Escanea el QR con **Expo Go** para probar la app en tu celular.
  
 ---
  
@@ -104,8 +106,8 @@ npm run app:dev
 ## 🌐 Deploy
  
 **Backend (API):**
-- Se puede desplegar como contenedor en ECS Fargate o Elastic Beanstalk
-- Base de datos en PostgreSQL (RDS o Supabase)
+- Desplegado en Fly.io
+- Base de datos en PostgreSQL (Supabase/RDS)
 - Ajustar `DATABASE_URL` y secretos en las variables de entorno
  
 **App Móvil:**
@@ -129,5 +131,4 @@ npm run app:dev
  
 El código de este repositorio es propietario. No se concede licencia para usar, copiar, modificar ni distribuir sin consentimiento escrito del titular. Para usos comerciales o cualquier redistribución se requiere un acuerdo previo y por escrito.
  
-Ver archivo [LICENSE](./LICENSE) para los términos completos.
 Ver archivo [LICENSE](./LICENSE) para los términos completos.
