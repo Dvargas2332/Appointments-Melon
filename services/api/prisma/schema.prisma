@@ -5,7 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -143,7 +142,7 @@ model AvailabilityException {
 }
 
 model Appointment {
-  id         String   @id @default(cuid())
+  id         String   @id @id @default(cuid())
   businessId String
   customerId String
   staffId    String?
