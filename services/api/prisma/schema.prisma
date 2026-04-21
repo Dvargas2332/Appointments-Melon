@@ -142,7 +142,7 @@ model AvailabilityException {
 }
 
 model Appointment {
-  id         String   @id @id @default(cuid())
+  id         String   @id @default(cuid())
   businessId String
   customerId String
   staffId    String?
