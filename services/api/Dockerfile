@@ -1,28 +1,34 @@
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev
+# Etapa de dependencias
+FROM node:20-alpine AS builder
 
-FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+
+# Copiamos archivos de configuración
+COPY package*.json ./
 COPY tsconfig.json ./
-COPY prisma ./prisma
-COPY src ./src
-RUN npm run build
-RUN npx prisma generate
+COPY prisma ./prisma/
 
+# Instalamos TODAS las dependencias para poder construir
+RUN npm install
+
+# Copiamos el código fuente
+COPY src ./src/
+
+# Generamos el cliente de Prisma y construimos el proyecto
+RUN npx prisma generate
+RUN npm run build
+
+# --- Etapa de producción ---
 FROM node:20-alpine
+
 WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
-# Copy the prisma CLI so migrate deploy works at runtime
-COPY --from=build /app/node_modules/prisma ./node_modules/prisma
-COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+
 EXPOSE 3000
-# Run migrations then start the server
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
+
+# Comando para correr migraciones y encender la app
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
