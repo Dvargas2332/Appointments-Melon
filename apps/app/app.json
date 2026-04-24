@@ -24,6 +24,8 @@
     },
     "android": {
       "package": "com.melon.app",
+      "versionCode": 1,
+      "minSdkVersion": 24,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
