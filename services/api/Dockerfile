@@ -3,11 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies first (cache layer)
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci
+# Install all deps (including dev) needed to compile TypeScript
+RUN npm install --ignore-scripts
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -18,7 +18,7 @@ COPY src ./src/
 
 RUN npm run build
 
-# Prune dev dependencies
+# Remove dev dependencies for the runtime stage
 RUN npm prune --omit=dev
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
@@ -37,7 +37,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY package*.json ./
 
-# Switch to non-root user
 USER appuser
 
 EXPOSE 3000
