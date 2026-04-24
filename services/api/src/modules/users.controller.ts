@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { z, ZodError } from "zod";
 import { BookingService } from "../services/booking.service";
 import { AuthGuard, RequestWithUser } from "./auth.guard";
@@ -121,6 +121,14 @@ export class UsersController {
       if (err instanceof ZodError) throw new BadRequestException(err.issues);
       throw err;
     }
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete("me")
+  deleteAccount(@Req() req: RequestWithUser, @Body() body: unknown) {
+    const { password } = (body ?? {}) as { password?: string };
+    if (!password) throw new BadRequestException("Se requiere la contraseña para eliminar la cuenta");
+    return this.booking.deleteAccount(req.user.id, req.user.kind, password);
   }
 
   @UseGuards(AuthGuard)

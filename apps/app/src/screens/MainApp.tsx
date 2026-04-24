@@ -17,6 +17,7 @@ import { MelonLogo } from "../components/MelonLogo";
 import { ClientHomeScreen } from "./ClientHomeScreen";
 import { ClientAgendaScreen } from "./ClientAgendaScreen";
 import { BusinessScreen } from "./BusinessScreen";
+import { AccountScreen } from "./AccountScreen";
 import { sharedStyles, palette } from "../styles/theme";
 import { initialsFromName, resolveTimezone } from "../utils";
 import { Business, ScheduleSource } from "../types";
@@ -28,6 +29,7 @@ export function MainApp() {
   const [clientTab, setClientTab] = useState<ClientTab>("home");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const currentZone = resolveTimezone();
 
   const isClient = user?.kind === "client";
@@ -87,9 +89,15 @@ export function MainApp() {
                         <View style={styles.menu}>
                           <Pressable
                             style={styles.menuItem}
+                            onPress={() => { setShowMenu(false); setShowAccount(true); }}
+                          >
+                            <Text style={styles.menuText}>Mi cuenta</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.menuItem, styles.menuItemLast]}
                             onPress={() => { setShowMenu(false); logout(); }}
                           >
-                            <Text style={styles.menuText}>Log out</Text>
+                            <Text style={[styles.menuText, { color: palette.danger }]}>Cerrar sesión</Text>
                           </Pressable>
                         </View>
                       )}
@@ -131,15 +139,30 @@ export function MainApp() {
 
             {/* Business header */}
             {isBusiness && (
-              <View style={sharedStyles.card}>
+              <View style={[sharedStyles.card, showMenu ? styles.cardMenuOpen : null]}>
                 <View style={sharedStyles.rowBetween}>
                   <Text style={sharedStyles.sectionTitle}>Panel de negocio</Text>
-                  <Pressable
-                    style={styles.menuButton}
-                    onPress={() => { logout(); }}
-                  >
-                    <Ionicons name="log-out-outline" size={20} color={palette.danger} />
-                  </Pressable>
+                  <View style={styles.menuAnchor}>
+                    <Pressable style={styles.menuButton} onPress={() => setShowMenu((v) => !v)}>
+                      <Ionicons name="settings-outline" size={18} color={palette.accent} />
+                    </Pressable>
+                    {showMenu && (
+                      <View style={styles.menu}>
+                        <Pressable
+                          style={styles.menuItem}
+                          onPress={() => { setShowMenu(false); setShowAccount(true); }}
+                        >
+                          <Text style={styles.menuText}>Mi cuenta</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.menuItem, styles.menuItemLast]}
+                          onPress={() => { setShowMenu(false); logout(); }}
+                        >
+                          <Text style={[styles.menuText, { color: palette.danger }]}>Cerrar sesión</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             )}
@@ -158,6 +181,8 @@ export function MainApp() {
           {isBusiness && <BusinessScreen />}
         </ScrollView>
       </SafeAreaView>
+
+      {showAccount && <AccountScreen onClose={() => setShowAccount(false)} />}
     </GestureHandlerRootView>
   );
 }
@@ -202,5 +227,6 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   menuItem: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: palette.border },
+  menuItemLast: { borderBottomWidth: 0 },
   menuText: { fontSize: 14, color: palette.text },
 });

@@ -71,6 +71,8 @@ export const api = {
       ),
     updateMe: (token: string, data: Record<string, unknown>) =>
       request("/users/me", { method: "PATCH", token, body: data }),
+    deleteMe: (token: string, password: string) =>
+      request<{ ok: boolean }>("/users/me", { method: "DELETE", token, body: { password } }),
     registerClient: (data: { name: string; email: string; password: string }) =>
       request("/users/client", { method: "POST", body: data }),
     registerBusiness: (data: { name: string; email: string; password: string; role?: string }) =>

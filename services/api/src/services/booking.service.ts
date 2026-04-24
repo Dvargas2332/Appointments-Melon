@@ -144,6 +144,23 @@ export class BookingService {
     }
   }
 
+  async deleteAccount(userId: string, kind: "client" | "business", password: string) {
+    if (kind === "client") {
+      const user = await this.prisma.userClient.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException("Usuario no encontrado");
+      const ok = await compare(password, user.password);
+      if (!ok) throw new BadRequestException("Contraseña incorrecta");
+      await this.prisma.userClient.delete({ where: { id: userId } });
+    } else {
+      const user = await this.prisma.userBusiness.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException("Usuario no encontrado");
+      const ok = await compare(password, user.password);
+      if (!ok) throw new BadRequestException("Contraseña incorrecta");
+      await this.prisma.userBusiness.delete({ where: { id: userId } });
+    }
+    return { ok: true };
+  }
+
   async getProfile(userId: string, kind: "client" | "business") {
     if (kind === "client") {
       return this.prisma.userClient.findUnique({ where: { id: userId } });
