@@ -6,7 +6,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro   # self-signed or Let's Encrypt certs
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/legal:/etc/nginx/legal:ro
     depends_on:
       - api
     restart: always
