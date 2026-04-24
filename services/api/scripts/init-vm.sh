@@ -14,8 +14,8 @@ echo "==> Generating TLS certificate..."
 bash "$(dirname "$0")/gen-certs.sh" "$PUBLIC_IP"
 
 echo "==> Running Prisma migrations..."
-docker compose -f docker-compose.prod.yml run --rm api \
-  node -e "const{execSync}=require('child_process');execSync('npx prisma migrate deploy',{stdio:'inherit'})"
+docker compose -f docker-compose.prod.yml run --rm --user root api \
+  npx prisma migrate deploy
 
 echo "==> Starting stack..."
 docker compose -f docker-compose.prod.yml up -d --build
