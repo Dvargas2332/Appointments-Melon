@@ -24,6 +24,9 @@ RUN npm prune --omit=dev
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
+# Install libssl required by Prisma engine on Alpine
+RUN apk add --no-cache openssl
+
 # Security: run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
