@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
@@ -16,6 +17,9 @@ import { api } from "../api/client";
 import { sharedStyles, palette } from "../styles/theme";
 import { getErrorMessage } from "../utils";
 import { UserKind } from "../types";
+
+const TERMS_URL = "https://68.233.124.190/legal/terms";
+const PRIVACY_URL = "https://68.233.124.190/legal/privacy";
 
 type Props = {
   onClose: () => void;
@@ -33,6 +37,7 @@ export function RegisterSheet({ onClose, onSuccess, socialProviders, onSocialLog
   const [businessName, setBusinessName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const validate = () => {
     if (!kind) {
@@ -53,6 +58,10 @@ export function RegisterSheet({ onClose, onSuccess, socialProviders, onSocialLog
     }
     if (kind === "business" && !businessName.trim()) {
       Alert.alert("Nombre de empresa requerido", "Por favor ingresa el nombre de tu empresa.");
+      return false;
+    }
+    if (!termsAccepted) {
+      Alert.alert("Términos requeridos", "Debes aceptar los Términos y Condiciones para continuar.");
       return false;
     }
     return true;
@@ -199,6 +208,23 @@ export function RegisterSheet({ onClose, onSuccess, socialProviders, onSocialLog
             </Pressable>
           </View>
 
+          {/* T&C */}
+          <Pressable style={styles.termsRow} onPress={() => setTermsAccepted((v) => !v)}>
+            <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+              {termsAccepted && <Ionicons name="checkmark" size={14} color="#fff" />}
+            </View>
+            <Text style={styles.termsText}>
+              Acepto los{" "}
+              <Text style={styles.termsLink} onPress={() => Linking.openURL(TERMS_URL)}>
+                Términos y Condiciones
+              </Text>
+              {" "}y la{" "}
+              <Text style={styles.termsLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+                Política de Privacidad
+              </Text>
+            </Text>
+          </Pressable>
+
           {/* Botones */}
           <View style={[sharedStyles.row, styles.actions]}>
             <Pressable
@@ -209,9 +235,9 @@ export function RegisterSheet({ onClose, onSuccess, socialProviders, onSocialLog
               <Text style={sharedStyles.buttonText}>Cancelar</Text>
             </Pressable>
             <Pressable
-              style={({ pressed }) => [sharedStyles.primaryButton, pressed && sharedStyles.pressed, { flex: 1, opacity: submitting || !kind ? 0.6 : 1 }]}
+              style={({ pressed }) => [sharedStyles.primaryButton, pressed && sharedStyles.pressed, { flex: 1, opacity: submitting || !kind || !termsAccepted ? 0.6 : 1 }]}
               onPress={handleRegister}
-              disabled={submitting || !kind}
+              disabled={submitting || !kind || !termsAccepted}
             >
               <Text style={sharedStyles.primaryButtonText}>{submitting ? "Creando..." : "Crear cuenta"}</Text>
             </Pressable>
@@ -254,4 +280,18 @@ const styles = StyleSheet.create({
   },
   socialCircleText: { fontWeight: "800", fontSize: 15 },
   actions: { marginTop: 4 },
+  termsRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 4 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: palette.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxChecked: { backgroundColor: palette.accent },
+  termsText: { flex: 1, fontSize: 12, color: palette.muted, lineHeight: 18 },
+  termsLink: { color: palette.accent, textDecorationLine: "underline" },
 });
