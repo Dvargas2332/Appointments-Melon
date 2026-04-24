@@ -51,8 +51,13 @@ const getExpoHost = () => {
 };
 
 export const resolveApiBaseUrl = () => {
+  // EXPO_PUBLIC_API_BASE_URL must be set in .env / EAS build env:
+  //   development : http://192.168.x.x:3000  (local machine IP)
+  //   production  : https://<oracle-vm-ip>    (nginx HTTPS on Oracle Cloud)
   const configured = (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined)?.trim();
   if (configured) return trimTrailingSlash(configured);
+
+  // Fallback for local Expo Go development only
   if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.hostname) {
     return `http://${window.location.hostname}:3000`;
   }
@@ -60,6 +65,9 @@ export const resolveApiBaseUrl = () => {
   if (expoHost) return `http://${expoHost}:3000`;
   return Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
 };
+
+
+
 
 export const isoToday = () => new Date().toISOString().slice(0, 10);
 

@@ -1,0 +1,32 @@
+# Dependencies (reinstalled during build)
+node_modules/
+
+# Compiled output (rebuilt during build)
+dist/
+
+# Environment files — never bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# Local dev / editor artifacts
+.vscode/
+*.log
+npm-debug.log*
+
+# Test artifacts
+coverage/
+jest.config.js
+
+# Git
+.git/
+.gitignore
+
+# Docker files (not needed inside the image)
+Dockerfile
+docker-compose*.yml
+nginx/
+
+# OS artifacts
+.DS_Store
+Thumbs.db

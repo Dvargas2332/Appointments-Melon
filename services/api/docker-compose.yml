@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder        # use builder stage so ts-node / hot-reload works
+    command: ["node", "-r", "ts-node/register", "src/main.ts"]
+    volumes:
+      - ./src:/app/src:ro   # live reload without rebuilding
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - melon_local
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: melon
+      POSTGRES_PASSWORD: melon_dev_password
+      POSTGRES_DB: melon_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U melon -d melon_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - melon_local
+
+volumes:
+  postgres_data:
+
+networks:
+  melon_local:
+    driver: bridge
