@@ -11,14 +11,20 @@
     h1 { font-size: 2rem; font-weight: 800; color: #3f9f57; margin-bottom: 4px; }
     .meta { font-size: 0.85rem; color: #6b7280; margin-bottom: 40px; }
     h2 { font-size: 1.1rem; font-weight: 700; margin: 32px 0 10px; color: #0f172a; }
-    p, li { font-size: 0.95rem; color: #1e293b; margin-bottom: 8px; }
-    ul { padding-left: 20px; margin-bottom: 8px; }
+    h3 { font-size: 0.95rem; font-weight: 700; margin: 20px 0 6px; color: #1e293b; }
+    p, li { font-size: 0.93rem; color: #1e293b; margin-bottom: 8px; }
+    ul, ol { padding-left: 20px; margin-bottom: 10px; }
     a { color: #3f9f57; }
     .divider { border: none; border-top: 1px solid #e6e7ed; margin: 40px 0; }
     .badge { display: inline-block; background: #e8f5ea; color: #3f9f57; font-size: 0.75rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.9rem; }
+    .highlight { background: #fffbeb; border-left: 4px solid #f4c362; padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 0.9rem; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.88rem; }
     th { background: #e8f5ea; text-align: left; padding: 8px 12px; font-weight: 700; }
     td { padding: 8px 12px; border-bottom: 1px solid #e6e7ed; vertical-align: top; }
+    .toc { background: #fff; border: 1px solid #e6e7ed; border-radius: 8px; padding: 20px 24px; margin-bottom: 36px; }
+    .toc p { font-weight: 700; margin-bottom: 8px; }
+    .toc ol { margin: 0; }
+    .toc li { margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -27,124 +33,251 @@
   <p class="meta">Última actualización: 24 de abril de 2026 &nbsp;·&nbsp; Versión 1.0</p>
   <span class="badge">Melon — Agenda de Citas</span>
 
-  <h2>1. Responsable del Tratamiento</h2>
+  <div class="highlight">
+    Su privacidad es importante para nosotros. Esta Política explica qué datos recopilamos, por qué, cómo los usamos y cuáles son sus derechos. Léala con atención antes de usar la App.
+  </div>
+
+  <div class="toc">
+    <p>Tabla de Contenidos</p>
+    <ol>
+      <li><a href="#p1">Responsable del Tratamiento</a></li>
+      <li><a href="#p2">Datos que Recopilamos</a></li>
+      <li><a href="#p3">Permisos del Dispositivo</a></li>
+      <li><a href="#p4">Finalidad y Base Legal del Tratamiento</a></li>
+      <li><a href="#p5">Menores de Edad</a></li>
+      <li><a href="#p6">Compartición de Datos con Terceros</a></li>
+      <li><a href="#p7">Transferencias Internacionales</a></li>
+      <li><a href="#p8">Seguridad de los Datos</a></li>
+      <li><a href="#p9">Retención de Datos</a></li>
+      <li><a href="#p10">Sus Derechos</a></li>
+      <li><a href="#p11">Derechos Específicos por Región</a></li>
+      <li><a href="#p12">Cookies y Almacenamiento Local</a></li>
+      <li><a href="#p13">Notificaciones Push</a></li>
+      <li><a href="#p14">Cambios a esta Política</a></li>
+      <li><a href="#p15">Contacto y Reclamaciones</a></li>
+    </ol>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="p1">1. Responsable del Tratamiento</h2>
   <p><strong>Kazehanacloud / Diego Vargas Almengor</strong> es el responsable del tratamiento de los datos personales recopilados a través de la aplicación <strong>Melon</strong>.</p>
-  <p>Correo de contacto: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a></p>
+  <p>Correo de contacto para asuntos de privacidad: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a></p>
+  <p>Tiempo de respuesta máximo: 30 días hábiles desde la recepción de la solicitud.</p>
 
-  <h2>2. Datos que Recopilamos</h2>
+  <!-- 2 -->
+  <h2 id="p2">2. Datos que Recopilamos</h2>
+  <h3>2.1 Datos proporcionados directamente por el usuario</h3>
   <table>
-    <tr><th>Categoría</th><th>Datos específicos</th><th>Fuente</th></tr>
-    <tr><td>Identificación</td><td>Nombre completo, correo electrónico, contraseña (cifrada)</td><td>Registro manual</td></tr>
-    <tr><td>Contacto</td><td>Número de teléfono (opcional)</td><td>Perfil del usuario</td></tr>
-    <tr><td>Ubicación</td><td>Coordenadas GPS, país y región inferidos</td><td>Dispositivo (solo con permiso)</td></tr>
-    <tr><td>Contenido multimedia</td><td>Fotos de perfil e imágenes de negocio</td><td>Cámara / Galería (solo con permiso)</td></tr>
-    <tr><td>Agenda / Calendario</td><td>Eventos de citas creados por el usuario</td><td>Calendario del dispositivo (solo con permiso)</td></tr>
-    <tr><td>Actividad en la App</td><td>Citas agendadas, servicios consultados, historial de actividades</td><td>Uso de la App</td></tr>
-    <tr><td>Datos de negocio</td><td>Nombre, categoría, horarios, servicios, personal (solo cuentas Empresa)</td><td>Registro de empresa</td></tr>
-    <tr><td>Datos de pago</td><td>Procesados exclusivamente por Google Play Billing; no almacenamos datos de tarjeta</td><td>Google Play</td></tr>
-    <tr><td>Técnicos</td><td>Dirección IP, tipo de dispositivo, sistema operativo, versión de la App</td><td>Automático</td></tr>
+    <tr><th>Categoría</th><th>Datos específicos</th></tr>
+    <tr><td>Identificación</td><td>Nombre completo, correo electrónico, contraseña (almacenada con hash bcrypt)</td></tr>
+    <tr><td>Contacto</td><td>Número de teléfono (opcional)</td></tr>
+    <tr><td>Perfil</td><td>Foto de perfil (opcional), estado de visibilidad</td></tr>
+    <tr><td>Datos de negocio</td><td>Nombre del negocio, categoría, dirección, teléfono, horarios, servicios, personal (solo cuentas Empresa)</td></tr>
+    <tr><td>Contenido de citas</td><td>Notas del cliente, notas del negocio, historial de citas</td></tr>
   </table>
 
-  <h2>3. Finalidad del Tratamiento</h2>
-  <ul>
-    <li>Crear y gestionar su cuenta de usuario.</li>
-    <li>Permitir el agendamiento de citas entre clientes y negocios.</li>
-    <li>Enviar notificaciones de confirmación, recordatorio y cambios de cita.</li>
-    <li>Mostrar negocios cercanos según su ubicación.</li>
-    <li>Gestionar suscripciones de membresía empresarial.</li>
-    <li>Mejorar la funcionalidad y seguridad de la App.</li>
-    <li>Cumplir con obligaciones legales aplicables.</li>
-  </ul>
-
-  <h2>4. Base Legal del Tratamiento</h2>
-  <ul>
-    <li><strong>Consentimiento:</strong> para ubicación GPS, acceso a cámara/galería, acceso a calendario y comunicaciones de marketing.</li>
-    <li><strong>Ejecución del contrato:</strong> para gestión de cuenta, citas y membresías.</li>
-    <li><strong>Interés legítimo:</strong> para seguridad, prevención de fraude y mejora del servicio.</li>
-    <li><strong>Obligación legal:</strong> para cumplir con requerimientos de autoridades competentes.</li>
-  </ul>
-
-  <h2>5. Permisos del Dispositivo</h2>
+  <h3>2.2 Datos recopilados automáticamente</h3>
   <table>
-    <tr><th>Permiso</th><th>Uso</th><th>¿Obligatorio?</th></tr>
-    <tr><td>Ubicación (GPS)</td><td>Mostrar negocios cercanos; autocompletar país/región</td><td>No — funcionalidad limitada sin él</td></tr>
-    <tr><td>Cámara</td><td>Tomar fotos de perfil o negocio</td><td>No</td></tr>
-    <tr><td>Galería / Almacenamiento</td><td>Seleccionar imágenes existentes</td><td>No</td></tr>
-    <tr><td>Calendario del dispositivo</td><td>Sincronizar citas agendadas con la agenda personal</td><td>No</td></tr>
+    <tr><th>Categoría</th><th>Datos específicos</th></tr>
+    <tr><td>Ubicación</td><td>Coordenadas GPS, país y región inferidos (solo con permiso explícito)</td></tr>
+    <tr><td>Técnicos</td><td>Dirección IP, tipo de dispositivo, sistema operativo, versión de la App, zona horaria</td></tr>
+    <tr><td>Uso</td><td>Citas creadas/canceladas, servicios consultados, frecuencia de uso</td></tr>
+    <tr><td>Calendario</td><td>Eventos de citas sincronizados con la agenda del dispositivo (solo con permiso y solicitud explícita del usuario)</td></tr>
   </table>
-  <p>Puede revocar cualquier permiso en cualquier momento desde <strong>Configuración → Aplicaciones → Melon → Permisos</strong> en su dispositivo. La revocación no afecta el tratamiento previo ya realizado.</p>
 
-  <h2>6. Menores de Edad</h2>
-  <p>La App <strong>no está dirigida a menores de 13 años</strong> y no recopilamos intencionadamente datos de niños menores de esa edad. Si tiene entre 13 y 17 años, debe obtener el consentimiento de su padre, madre o tutor legal antes de registrarse.</p>
-  <p>Las cuentas de Empresa requieren ser mayor de 18 años.</p>
-  <p>Si descubrimos que hemos recopilado datos de un menor de 13 años sin consentimiento verificable, eliminaremos dicha información de inmediato. Contáctenos a <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a>.</p>
+  <h3>2.3 Datos de pago</h3>
+  <p>Los pagos de membresía son procesados exclusivamente por <strong>Google Play Billing</strong>. El Operador <strong>no almacena, procesa ni tiene acceso</strong> a datos de tarjetas de crédito, débito u otros instrumentos de pago. Solo recibimos confirmación del estado de la suscripción (activa, cancelada, en prueba).</p>
 
-  <h2>7. Compartición de Datos con Terceros</h2>
-  <p>No vendemos sus datos personales. Compartimos información solo en los siguientes casos:</p>
+  <!-- 3 -->
+  <h2 id="p3">3. Permisos del Dispositivo</h2>
+  <table>
+    <tr><th>Permiso</th><th>Para qué se usa</th><th>¿Se comparte?</th><th>¿Obligatorio?</th></tr>
+    <tr><td>Ubicación GPS (en uso)</td><td>Mostrar negocios cercanos; autocompletar país/región al registrar un negocio</td><td>No se comparte con terceros</td><td>No</td></tr>
+    <tr><td>Cámara</td><td>Capturar fotos de perfil o imágenes del negocio</td><td>Las imágenes se almacenan en nuestros servidores si el usuario las sube</td><td>No</td></tr>
+    <tr><td>Galería / Almacenamiento</td><td>Seleccionar imágenes existentes del dispositivo</td><td>Las imágenes se almacenan en nuestros servidores si el usuario las sube</td><td>No</td></tr>
+    <tr><td>Calendario del dispositivo</td><td>Sincronizar citas con la agenda personal, únicamente si el usuario lo activa</td><td>No se comparte con terceros</td><td>No</td></tr>
+  </table>
+  <p>Puede revocar cualquier permiso en cualquier momento desde <strong>Configuración → Aplicaciones → Melon → Permisos</strong>. La revocación no afecta los datos previamente recopilados ni el tratamiento ya realizado.</p>
+
+  <!-- 4 -->
+  <h2 id="p4">4. Finalidad y Base Legal del Tratamiento</h2>
+  <table>
+    <tr><th>Finalidad</th><th>Base legal</th></tr>
+    <tr><td>Crear y gestionar su cuenta</td><td>Ejecución del contrato</td></tr>
+    <tr><td>Permitir agendamiento de citas</td><td>Ejecución del contrato</td></tr>
+    <tr><td>Enviar notificaciones de cita</td><td>Ejecución del contrato / Consentimiento</td></tr>
+    <tr><td>Mostrar negocios por ubicación</td><td>Consentimiento (permiso GPS)</td></tr>
+    <tr><td>Gestionar suscripciones de membresía</td><td>Ejecución del contrato</td></tr>
+    <tr><td>Sincronizar con calendario del dispositivo</td><td>Consentimiento explícito</td></tr>
+    <tr><td>Análisis de uso y mejora del servicio</td><td>Interés legítimo</td></tr>
+    <tr><td>Prevención de fraude y seguridad</td><td>Interés legítimo / Obligación legal</td></tr>
+    <tr><td>Cumplimiento de requerimientos legales</td><td>Obligación legal</td></tr>
+  </table>
+
+  <!-- 5 -->
+  <h2 id="p5">5. Menores de Edad</h2>
+  <p>La App <strong>no está dirigida a menores de 13 años</strong>. No recopilamos intencionalmente datos personales de niños menores de 13 años. Esto cumple con:</p>
   <ul>
-    <li><strong>Google Play Billing:</strong> Para procesar pagos de membresías. Sujeto a la <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Política de Privacidad de Google</a>.</li>
-    <li><strong>Supabase (base de datos):</strong> Infraestructura de almacenamiento de datos, operada en servidores seguros.</li>
-    <li><strong>Proveedores de infraestructura:</strong> Oracle Cloud (servidor de aplicaciones). Sujetos a acuerdos de confidencialidad.</li>
-    <li><strong>Autoridades legales:</strong> Cuando sea requerido por ley, orden judicial o para proteger derechos legítimos.</li>
+    <li><strong>COPPA</strong> (Children's Online Privacy Protection Act) — EE.UU.</li>
+    <li>Las leyes equivalentes de protección de menores en las jurisdicciones donde opera la App.</li>
+  </ul>
+  <p>Los usuarios de entre 13 y 17 años deben contar con el consentimiento verificable de su padre, madre o tutor legal. Las cuentas de Empresa requieren mayoría de edad (18+).</p>
+  <p>Si tenemos conocimiento de que hemos recopilado datos de un menor de 13 años sin el consentimiento requerido, eliminaremos dicha información de inmediato. Para reportar este caso: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a>.</p>
+
+  <!-- 6 -->
+  <h2 id="p6">6. Compartición de Datos con Terceros</h2>
+  <p><strong>No vendemos, alquilamos ni comercializamos sus datos personales.</strong> Compartimos información únicamente en los siguientes casos:</p>
+  <table>
+    <tr><th>Tercero</th><th>Datos compartidos</th><th>Propósito</th></tr>
+    <tr><td>Google Play Billing (Google LLC)</td><td>Estado de suscripción</td><td>Procesamiento de pagos de membresía</td></tr>
+    <tr><td>Supabase Inc.</td><td>Todos los datos de usuario almacenados</td><td>Base de datos (infraestructura)</td></tr>
+    <tr><td>Oracle Cloud Infrastructure</td><td>Datos en tránsito y en reposo del servidor</td><td>Servidor de aplicaciones (infraestructura)</td></tr>
+    <tr><td>Autoridades competentes</td><td>Según lo requerido por ley</td><td>Cumplimiento legal, órdenes judiciales</td></tr>
+  </table>
+  <p>Los proveedores de infraestructura están sujetos a acuerdos de procesamiento de datos (DPA) y obligaciones de confidencialidad. No tienen autorización para usar sus datos para fines distintos a los contratados.</p>
+
+  <!-- 7 -->
+  <h2 id="p7">7. Transferencias Internacionales de Datos</h2>
+  <p>Sus datos pueden ser procesados en:</p>
+  <ul>
+    <li><strong>Canadá (Montreal):</strong> Servidor de aplicaciones Oracle Cloud.</li>
+    <li><strong>EE.UU. / Japón:</strong> Infraestructura de base de datos Supabase.</li>
+  </ul>
+  <p>Garantizamos que estas transferencias se realizan con salvaguardas adecuadas:</p>
+  <ul>
+    <li>Acuerdos contractuales estándar con los proveedores.</li>
+    <li>Cifrado en tránsito (TLS 1.2/1.3) y en reposo.</li>
+    <li>Para usuarios en la UE/EEE: cumplimos con las cláusulas contractuales tipo (SCCs) del RGPD cuando aplique.</li>
   </ul>
 
-  <h2>8. Transferencias Internacionales de Datos</h2>
-  <p>Sus datos pueden ser procesados en servidores ubicados en Canadá (Oracle Cloud, región Montreal) y EE.UU./Japón (Supabase). Garantizamos que dichas transferencias se realizan con las salvaguardas adecuadas conforme a las leyes de protección de datos aplicables en su país.</p>
-
-  <h2>9. Seguridad</h2>
-  <p>Implementamos las siguientes medidas de seguridad:</p>
+  <!-- 8 -->
+  <h2 id="p8">8. Seguridad de los Datos</h2>
+  <p>Implementamos medidas técnicas y organizativas apropiadas para proteger sus datos:</p>
   <ul>
-    <li>Transmisión cifrada mediante TLS 1.2/1.3.</li>
-    <li>Contraseñas almacenadas con hash criptográfico (bcrypt).</li>
-    <li>Autenticación mediante JWT con expiración configurada.</li>
-    <li>Acceso restringido a datos de producción.</li>
-    <li>Servidor detrás de proxy inverso con rate limiting y cabeceras de seguridad.</li>
+    <li>Transmisión cifrada mediante <strong>TLS 1.2/1.3</strong>.</li>
+    <li>Contraseñas almacenadas con <strong>hash bcrypt</strong> (nunca en texto plano).</li>
+    <li>Autenticación mediante <strong>JWT</strong> con expiración configurada.</li>
+    <li>Servidor detrás de proxy inverso nginx con rate limiting y cabeceras de seguridad HTTP.</li>
+    <li>Acceso restringido a datos de producción por principio de mínimo privilegio.</li>
+    <li>Contenedor de aplicación ejecutado como usuario no-root.</li>
   </ul>
-  <p>Ningún sistema es 100% seguro. En caso de brecha de seguridad que afecte sus datos, le notificaremos en un plazo razonable conforme a la ley aplicable.</p>
+  <p>Ningún sistema es 100% seguro. En caso de brecha de seguridad que afecte sus datos personales, le notificaremos en el plazo exigido por la legislación aplicable (generalmente 72 horas para notificación a autoridades, y sin demora indebida para notificación a usuarios afectados).</p>
 
-  <h2>10. Retención de Datos</h2>
-  <ul>
-    <li>Datos de cuenta activa: mientras la cuenta esté activa.</li>
-    <li>Datos de citas: 2 años tras la fecha de la cita.</li>
-    <li>Datos de facturación/membresía: según lo exija la legislación fiscal aplicable (generalmente 5-7 años).</li>
-    <li>Tras la eliminación de cuenta: los datos se anonomizan o eliminan en un plazo de 30 días, salvo obligación legal de retención.</li>
-  </ul>
+  <!-- 9 -->
+  <h2 id="p9">9. Retención de Datos</h2>
+  <table>
+    <tr><th>Tipo de dato</th><th>Período de retención</th></tr>
+    <tr><td>Datos de cuenta activa</td><td>Mientras la cuenta esté activa</td></tr>
+    <tr><td>Historial de citas</td><td>2 años desde la fecha de la cita</td></tr>
+    <tr><td>Registros de suscripción/facturación</td><td>Según exija la legislación fiscal aplicable (generalmente 5-7 años)</td></tr>
+    <tr><td>Registros de seguridad (logs)</td><td>90 días</td></tr>
+    <tr><td>Datos tras eliminación de cuenta</td><td>Anonimizados o eliminados en 30 días, salvo obligación legal</td></tr>
+  </table>
 
-  <h2>11. Sus Derechos</h2>
+  <!-- 10 -->
+  <h2 id="p10">10. Sus Derechos</h2>
   <p>Dependiendo de su jurisdicción, usted tiene derecho a:</p>
   <ul>
-    <li><strong>Acceso:</strong> Solicitar una copia de sus datos personales.</li>
+    <li><strong>Acceso:</strong> Solicitar una copia de sus datos personales que tratamos.</li>
     <li><strong>Rectificación:</strong> Corregir datos inexactos o incompletos.</li>
-    <li><strong>Eliminación:</strong> Solicitar la eliminación de sus datos ("derecho al olvido").</li>
-    <li><strong>Portabilidad:</strong> Recibir sus datos en formato estructurado.</li>
-    <li><strong>Oposición:</strong> Oponerse a ciertos tratamientos basados en interés legítimo.</li>
-    <li><strong>Limitación:</strong> Solicitar que limitemos el tratamiento de sus datos.</li>
-    <li><strong>Retirar consentimiento:</strong> En cualquier momento para tratamientos basados en consentimiento.</li>
+    <li><strong>Eliminación ("derecho al olvido"):</strong> Solicitar la supresión de sus datos cuando no exista obligación legal de conservarlos.</li>
+    <li><strong>Portabilidad:</strong> Recibir sus datos en formato estructurado, de uso común y legible por máquina.</li>
+    <li><strong>Oposición:</strong> Oponerse al tratamiento basado en interés legítimo.</li>
+    <li><strong>Limitación:</strong> Solicitar que restrinjamos el tratamiento de sus datos en determinadas circunstancias.</li>
+    <li><strong>Retirar consentimiento:</strong> En cualquier momento para los tratamientos basados en consentimiento, sin afectar la licitud del tratamiento previo.</li>
+    <li><strong>No discriminación:</strong> No será discriminado por ejercer sus derechos de privacidad.</li>
   </ul>
-  <p>Para ejercer cualquiera de estos derechos, contáctenos en <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a>. Responderemos en un plazo de 30 días.</p>
+  <p>Para ejercer cualquiera de estos derechos, envíe su solicitud a <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a> indicando su nombre, correo registrado y el derecho que desea ejercer. Responderemos en un plazo máximo de 30 días.</p>
 
-  <h2>12. Derechos Específicos por Región</h2>
+  <!-- 11 -->
+  <h2 id="p11">11. Derechos Específicos por Región</h2>
+
+  <h3>11.1 Estados Unidos — CCPA / CPRA (California)</h3>
+  <p>Los residentes de California tienen los siguientes derechos adicionales bajo la CCPA/CPRA:</p>
   <ul>
-    <li><strong>California (CCPA/CPRA):</strong> Los residentes de California tienen derechos adicionales sobre sus datos, incluyendo el derecho a saber, eliminar y optar por no vender información personal. No vendemos datos personales.</li>
-    <li><strong>Canadá (PIPEDA / Ley 25 Quebec):</strong> Cumplimos con los principios de privacidad de PIPEDA. Los residentes de Quebec tienen derechos adicionales bajo la Ley 25.</li>
-    <li><strong>Japón (APPI):</strong> Tratamos sus datos de conformidad con la Ley de Protección de Información Personal de Japón.</li>
-    <li><strong>México (LFPDPPP):</strong> Cumplimos con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares.</li>
-    <li><strong>Otros países de América Latina:</strong> Cumplimos con las leyes de protección de datos personales aplicables en cada país.</li>
+    <li>Derecho a saber qué información personal recopilamos, usamos, divulgamos y vendemos.</li>
+    <li>Derecho a eliminar su información personal.</li>
+    <li>Derecho a optar por no participar en la "venta" de información personal. <strong>Aclaración: No vendemos datos personales.</strong></li>
+    <li>Derecho a la no discriminación por ejercer sus derechos CCPA.</li>
+    <li>Derecho a corregir información personal inexacta.</li>
+    <li>Derecho a limitar el uso de información sensible.</li>
   </ul>
+  <p>Para solicitudes CCPA: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a></p>
 
-  <h2>13. Cookies y Tecnologías de Seguimiento</h2>
-  <p>La App móvil no utiliza cookies de terceros. Utilizamos almacenamiento local del dispositivo (AsyncStorage) exclusivamente para mantener la sesión del usuario y preferencias de la App.</p>
+  <h3>11.2 Canadá — PIPEDA / Ley 25 (Quebec)</h3>
+  <p>Cumplimos con los 10 principios de privacidad de PIPEDA. Los residentes de Quebec tienen derechos adicionales bajo la Ley 25 (en vigor desde 2023), incluyendo el derecho a la desindexación y a la portabilidad. Puede retirar su consentimiento en cualquier momento con efecto futuro.</p>
 
-  <h2>14. Cambios a esta Política</h2>
-  <p>Podemos actualizar esta Política de Privacidad. Notificaremos cambios materiales con al menos 15 días de anticipación mediante notificación en la App o correo electrónico. Le recomendamos revisar esta página periódicamente.</p>
+  <h3>11.3 México — LFPDPPP</h3>
+  <p>Tiene los derechos ARCO (Acceso, Rectificación, Cancelación y Oposición) conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares. Para ejercerlos: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a>. Responderemos en 20 días hábiles.</p>
 
+  <h3>11.4 Colombia — Ley 1581 de 2012</h3>
+  <p>Los titulares de datos en Colombia tienen los derechos de conocer, actualizar, rectificar y suprimir sus datos, así como revocar la autorización otorgada.</p>
+
+  <h3>11.5 Argentina — Ley 25.326</h3>
+  <p>Los usuarios en Argentina tienen derecho de acceso, rectificación, supresión y confidencialidad de sus datos personales conforme a la Ley de Protección de los Datos Personales.</p>
+
+  <h3>11.6 Brasil — LGPD (Lei Geral de Proteção de Dados)</h3>
+  <p>Los usuarios en Brasil tienen los derechos previstos en la LGPD, incluyendo confirmación del tratamiento, acceso, corrección, anonimización, portabilidad, eliminación, información sobre compartición y revocación del consentimiento.</p>
+
+  <h3>11.7 Japón — APPI</h3>
+  <p>Tratamos sus datos conforme a la Ley de Protección de Información Personal (APPI) y sus enmiendas. Tiene derecho a solicitar divulgación, corrección y suspensión del uso de sus datos personales.</p>
+
+  <h3>11.8 Corea del Sur — PIPA</h3>
+  <p>Cumplimos con la Personal Information Protection Act de Corea del Sur. Tiene derechos de acceso, corrección, eliminación y suspensión del tratamiento.</p>
+
+  <h3>11.9 Singapur — PDPA</h3>
+  <p>Cumplimos con la Personal Data Protection Act de Singapur, incluyendo las obligaciones de notificación de brechas (dentro de 3 días para incidentes significativos).</p>
+
+  <h3>11.10 Tailandia — PDPA</h3>
+  <p>Cumplimos con la Personal Data Protection Act de Tailandia (vigente desde 2022). Los titulares tienen derechos de acceso, rectificación, eliminación, portabilidad y oposición.</p>
+
+  <h3>11.11 Filipinas — DPA</h3>
+  <p>Cumplimos con la Data Privacy Act de Filipinas (RA 10173). Tiene derecho a ser informado, acceder, objetar, borrar o bloquear, indemnización y portabilidad de datos.</p>
+
+  <h3>11.12 Unión Europea / EEE — RGPD (uso futuro)</h3>
+  <p>Aunque la App no está actualmente dirigida al mercado europeo, en caso de acceso desde la UE/EEE aplican todos los derechos del RGPD (Arts. 15-22), incluyendo el derecho a presentar reclamación ante la autoridad de control competente de su Estado miembro. La base legal principal es el consentimiento (Art. 6.1.a) y la ejecución del contrato (Art. 6.1.b).</p>
+
+  <!-- 12 -->
+  <h2 id="p12">12. Cookies y Almacenamiento Local</h2>
+  <p>La aplicación móvil <strong>no utiliza cookies de terceros</strong>. Utilizamos almacenamiento local del dispositivo (AsyncStorage) exclusivamente para:</p>
+  <ul>
+    <li>Mantener la sesión del usuario (token JWT).</li>
+    <li>Guardar preferencias de la App (tema, idioma, configuración de notificaciones).</li>
+  </ul>
+  <p>Este almacenamiento es local en su dispositivo y puede eliminarse desinstalando la App o limpiando los datos de la aplicación desde la configuración del dispositivo.</p>
+
+  <!-- 13 -->
+  <h2 id="p13">13. Notificaciones Push</h2>
+  <p>Con su consentimiento, la App puede enviarle notificaciones push para:</p>
+  <ul>
+    <li>Recordatorios de citas próximas.</li>
+    <li>Confirmaciones o cambios en citas.</li>
+    <li>Mensajes del negocio relacionados con su cita.</li>
+  </ul>
+  <p>Puede desactivar las notificaciones push en cualquier momento desde <strong>Configuración del dispositivo → Notificaciones → Melon</strong>. La desactivación no afecta el funcionamiento general de la App.</p>
+
+  <!-- 14 -->
+  <h2 id="p14">14. Cambios a esta Política</h2>
+  <p>Podemos actualizar esta Política de Privacidad para reflejar cambios en nuestras prácticas, tecnología o legislación aplicable. Notificaremos cambios materiales con al menos <strong>15 días de anticipación</strong> mediante:</p>
+  <ul>
+    <li>Notificación destacada en la App.</li>
+    <li>Correo electrónico a la dirección registrada.</li>
+  </ul>
+  <p>Le recomendamos revisar esta página periódicamente. La fecha de "Última actualización" en el encabezado refleja la versión vigente.</p>
+
+  <!-- 15 -->
   <hr class="divider" />
-
-  <h2>Contacto y Reclamaciones</h2>
-  <p>Para consultas, ejercicio de derechos o reclamaciones relacionadas con su privacidad:</p>
-  <p><strong>Kazehanacloud / Diego Vargas Almengor</strong><br />
-  Correo: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a></p>
-  <p>Si no recibe respuesta satisfactoria, puede acudir a la autoridad de protección de datos competente en su país.</p>
+  <h2 id="p15">15. Contacto y Reclamaciones</h2>
+  <p>Para consultas, ejercicio de derechos, reportes de incidentes de privacidad o reclamaciones:</p>
+  <p>
+    <strong>Kazehanacloud / Diego Vargas Almengor</strong><br />
+    Correo: <a href="mailto:vargas.almengor@gmail.com">vargas.almengor@gmail.com</a><br />
+    Tiempo de respuesta: máximo 30 días hábiles.
+  </p>
+  <p>Si no recibe una respuesta satisfactoria, puede presentar una reclamación ante la autoridad de protección de datos competente en su país o jurisdicción.</p>
+  <p>Para usuarios en EE.UU. (California): también puede contactar a la California Privacy Protection Agency (CPPA).</p>
+  <p>Para usuarios en México: puede acudir al Instituto Nacional de Transparencia, Acceso a la Información y Protección de Datos Personales (INAI).</p>
+  <p style="margin-top:24px;font-size:0.8rem;color:#6b7280;">© 2026 Kazehanacloud / Diego Vargas Almengor. Todos los derechos reservados.</p>
 </div>
 </body>
 </html>
