@@ -17,7 +17,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: melon-api:latest
     env_file:
       - .env.production
     expose:
