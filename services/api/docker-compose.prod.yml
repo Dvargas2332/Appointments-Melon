@@ -14,7 +14,10 @@ services:
       - melon_prod
 
   api:
-    image: ${DOCKER_IMAGE:-melon-api:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: melon-api:latest
     env_file:
       - .env.production
     expose:
